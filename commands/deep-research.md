@@ -110,7 +110,7 @@ ELIF depth == "표준":
 
 ELIF depth == "딥다이브":
   IF codex_available AND proxy_healthy:
-    → mode = "tofu-at-codex" (Opus + GPT-5.4 하이브리드)
+    → mode = "tofu-at-codex" (Opus + GPT-5.6 하이브리드)
   ELIF tmux_available:
     → mode = "tofu-at" (Agent Teams 폴백)
   ELSE:
@@ -173,9 +173,9 @@ IF mode == "tofu-at" (워커 = Sonnet):
   → Skill("prompt", "--batch Claude 상세 {서브토픽별 리서치 수집 지시}")
   → Claude 최적화: <default_to_action>, <use_parallel_tool_calls> 자동 포함
 
-IF mode == "tofu-at-codex" (워커 = GPT-5.4):
-  → Skill("prompt", "--batch GPT-5.2 상세 {서브토픽별 리서치 수집 지시}")
-  → GPT 최적화: <output_verbosity_spec>, <web_search_rules>, <uncertainty_and_ambiguity> 자동 포함
+IF mode == "tofu-at-codex" (워커 = GPT-5.6):
+  → Skill("prompt", "--batch GPT-5.6 상세 {서브토픽별 리서치 수집 지시}")
+  → GPT 최적화(5.6 Sol): Markdown lean — `# Success Criteria` / `# Stop Rules` / 불확실성 처리 지시 자동 포함 (구 XML 블록 <output_verbosity_spec> 등은 legacy 모델 명시 시)
 
 IF mode == "single" 또는 "parallel-agents":
   → Skill("prompt", "--batch Claude 상세 {서브토픽별 리서치 수집 지시}")
