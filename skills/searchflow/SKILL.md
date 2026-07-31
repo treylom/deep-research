@@ -37,6 +37,20 @@ P4 게이트 ── 문턱 통과 → 종료 / 미달 → 최저 축만 재조�
 5. **권한 preflight** — §5.
 6. **run_id 발급** — `sf-<YYYYMMDDTHHMMSSZ>-<4hex>`, 이후 모든 원장 라인·relay envelope 에 동일 값.
 
+### P1 — 취득 (사다리 + 차단 게이트)
+
+`references/acquisition.md` 의 사다리를 위에서부터. **취득 시도 전에 차단 여부를 기계로 판정한다**:
+
+```bash
+node scripts/robots-gate.mjs <대상 URL> [...]
+# exit 0=전건 allowed · 1=1건 이상 blocked(**정상 결과다 — 재시도·우회 신호 아님**) · 2=스크립트 오류
+# blocked 면 stdout 의 `ledger` 를 그대로 sources.jsonl 에 넣는다(grade=UNREACHABLE·status=unreachable)
+```
+
+- 판정은 **적용 가능한 User-agent 그룹 중 가장 엄한 것**이다. `*` 만 보면 안 된다 — 발행처가 `*` 는 열어두고 **AI 엔진 계열 이름에만 전면 불허**를 거는 경우가 실재한다(`fixtures/blocked-observed.md` 실측). `--ua-only "*"` 로 완화 가능하지만 기본값을 바꾸지 말 것.
+- `tos_notice` 가 붙으면 robots.txt **주석에 이용 제한 문구**가 있다는 뜻이다. 기계 판정 밖이므로 리드가 원문을 읽고 판단한다 — "파싱 못 했으니 없음"으로 넘기면 하드 게이트의 ToS 축이 조용히 사라진다.
+- **로그인 · 페이월 · CAPTCHA 는 이 스크립트로 판정 불가**하다. 취득 시도 중 관측해 같은 형식으로 원장에 적는다.
+
 ### P2 — 워커 계약 (은닉의 실체)
 
 워커에게 주는 것: 담당 축 1개 · 질의 · 취득 사다리(`references/acquisition.md`) · 반환 형식.
@@ -242,7 +256,17 @@ node scripts/relay-check.mjs --test   # 양성 + 음성 5종 + exit 계약
 
 ## 8. 산출
 
-- `out/report.md` — `references/report-contract.md` 의 칸 목록 전건
+- `out/report.md` — `references/report-contract.md` 의 칸 목록 전건. 합성 배열은 `references/synthesis.md`
+  (유형별 템플릿·판정표 스켈레톤). **템플릿이 조사를 늘리지 않는다** — 빈 칸은 「공백 선언」으로.
+
+```bash
+node scripts/report-check.mjs out/report.md --labels "$(node scripts/spawn-plan.mjs --type <유형> --harness cc --tools "<도구>" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).labels.join(",")))')"
+# 칸 목록 SoT = report-contract.md §1 파싱(복제 ❌) · 라벨은 spawn-plan 이 낸 문자열 그대로
+# exit 0=위반 0 · 1=칸 부재/제목만/라벨 부재 · 2=스크립트 오류
+node scripts/report-check.mjs --test   # 양성 0 / 음성 3종 대조
+```
+
+> 이 검사기는 **칸이 있고 비어있지 않은가**만 본다. 내용의 진위·인용 일치·점수 계산은 보지 않는다 — GREEN 을 "보고서가 옳다"로 인용하지 말 것.
 - `out/sources.jsonl` — schema v1 (리드 single-writer, `grade-ledger.mjs` 통과)
 - `out/relay.jsonl` — 사용자 질문 릴레이 원장 (리드 single-writer, `relay-check.mjs` 통과). 질문이 0건이었으면 이 파일은 만들지 않는다 — **빈 파일을 남기지 않는다**(검사기가 빈 원장을 위반으로 잡는다).
 
