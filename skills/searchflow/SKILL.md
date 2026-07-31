@@ -233,7 +233,16 @@ node scripts/relay-check.mjs --test   # 양성 + 음성 5종 + exit 계약
 | `shell` | degrade — 스크립트 검증 skip + 라벨 |
 | `agent` · `goal` | 순차 강등 |
 
-**거부(permission)와 부재(dependency)를 라벨에서 구분한다.** "도구가 없다"와 "도구를 못 쓰게 했다"는 다른 사실이다.
+**거부(permission)와 부재(dependency)를 라벨에서 구분한다.** "도구가 없다"와 "도구를 못 쓰게 했다"는 다른 사실이다. 산문으로만 구분하지 말고 **기계 라벨에서 갈라라** — 순차 강등 시 사유를 골라 넣는다:
+
+| 사유 | 호출 | 라벨 |
+|---|---|---|
+| **부재** — 이 환경에 오케스트레이션 도구가 없다 | `spawn-plan.mjs --type <t>` (도구 목록에 없음) | `degraded=no-orchestration-tool` |
+| **거부** — 도구는 실재하나 정책·권한이 호출을 막는다 | `spawn-plan.mjs --type <t> --tools Workflow,Task --denied` | `degraded=orchestration-denied` |
+
+`--tools` 에는 **실제 보이는 도구를 사실대로** 적고 거부는 `--denied` 로 선언한다. 도구를 목록에서 빼서 순차로 내려가면 라벨이 "없다"고 **거짓 주장**한다. 반대 세탁도 막혀 있다 — 도구 없이 `--denied` 는 exit 1 이다.
+
+> 이 갈림은 실측에서 나왔다(AC8 RUN1, 2026-07-31): 세션에 `Workflow`·`Agent` 가 실재했는데 정책이 호출을 금지해 순차로 갔고, 그때 기계 라벨은 부재를 주장했다. 리드가 본문에 사유를 따로 적어 살렸지만 **기계 대조로는 잡히지 않는 거짓말**이었다.
 
 ## 6. 에러 매트릭스
 

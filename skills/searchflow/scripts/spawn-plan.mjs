@@ -82,15 +82,31 @@ export function buildUnits(types, table) {
   };
 }
 
-export function plan({ types, harness = 'cc', tools = [], multiAgentApi = 'none', framesPath }) {
+export function plan({ types, harness = 'cc', tools = [], multiAgentApi = 'none', framesPath, denied = false }) {
   const table = loadFrameTable(framesPath);
   const { units, folded } = buildUnits(types, table);
   const ladder = TIERS[harness];
   if (!ladder) die(1, `harness 는 cc|codex 만: ${harness}`);
-  const chosen = ladder.find(r => r.when(tools, multiAgentApi));
+  const natural = ladder.find(r => r.when(tools, multiAgentApi));
+
+  // 강등 사유는 **두 가지이고 서로 다르다** — 한 문자열로 덮으면 라벨이 거짓말을 한다.
+  //   · no-orchestration-tool = **부재**(그 도구가 이 환경에 없다)
+  //   · orchestration-denied  = **거부**(도구는 실재하나 정책·권한이 호출을 막는다)
+  // 실측으로 걸렸다(AC8 RUN1, 2026-07-31): 세션에 Workflow·Agent 가 **실재**했는데
+  // 정책이 호출을 금지해 순차로 내려갔고, 그때 기계 라벨은 `no-orchestration-tool` 이라
+  // **없다고 주장**했다. 리드가 본문에 사유를 따로 적어 살렸지만, 기계 대조는 못 한다.
+  // ⇒ 거부는 호출자가 `--denied` 로 **선언**한다(도구 목록은 사실대로 유지).
+  let chosen = natural;
+  let reason = natural.parallelism === 'sequential' ? 'no-orchestration-tool' : null;
+  if (denied) {
+    if (natural.parallelism === 'sequential')
+      die(1, '--denied 는 오케스트레이션 도구가 실재할 때만 쓴다 — 이 tool surface 엔 없다. 부재는 no-orchestration-tool 이다(부재를 거부로 위장 ❌).');
+    chosen = ladder[ladder.length - 1];          // 사다리 마지막 단 = sequential
+    reason = 'orchestration-denied';
+  }
 
   const labels = [`parallelism=${chosen.parallelism}`, `tier=${chosen.tier}`];
-  if (chosen.parallelism === 'sequential') labels.push('degraded=no-orchestration-tool');
+  if (reason) labels.push(`degraded=${reason}`);
   if (folded > 0) labels.push(`frames-folded=${folded}`);
 
   return {
@@ -160,6 +176,16 @@ function selfTest() {
   t('음성 대조 — 강등 라벨 문자열 실재', seq.labels.includes('parallelism=sequential')
     && seq.labels.includes('degraded=no-orchestration-tool'), seq.labels.join(' '));
 
+  // 거부(정책) ≠ 부재(도구 없음) — 두 라벨이 실제로 갈리는지.
+  const denied = plan({ types: ['factcheck'], harness: 'cc', tools: ['Workflow', 'Task'], denied: true });
+  t('거부 선언 → orchestration-denied 로 갈린다', denied.parallelism === 'sequential'
+    && denied.labels.includes('degraded=orchestration-denied')
+    && !denied.labels.includes('degraded=no-orchestration-tool'), denied.labels.join(' '));
+
+  // 음성 대조 — 부재를 거부로 위장하지 못한다(라벨 세탁 차단).
+  const fake = spawnSelf(['--type', 'factcheck', '--denied']);          // tools 없음 + 거부 선언
+  t('음성 대조 — 도구 없이 --denied = exit 1 (부재를 거부로 위장 ❌)', fake.status === 1, `exit=${fake.status}`);
+
   process.stdout.write(`\n${pass}/${pass + fail} PASS\n`);
   return fail === 0 ? 0 : 1;
 }
@@ -179,13 +205,14 @@ function argOf(flag, dflt = null) {
 if (process.argv.includes('--test')) process.exit(selfTest());
 
 const typesArg = argOf('--type');
-if (!typesArg) die(1, '사용법: --type <t[,t2]> [--harness cc|codex] [--tools A,B] [--multi-agent-api public|collab_v2|none] [--frames <path>]  |  --test');
+if (!typesArg) die(1, '사용법: --type <t[,t2]> [--harness cc|codex] [--tools A,B] [--multi-agent-api public|collab_v2|none] [--denied] [--frames <path>]  |  --test');
 
 process.stdout.write(JSON.stringify(plan({
   types: typesArg.split(',').map(s => s.trim()).filter(Boolean),
   harness: argOf('--harness', 'cc'),
   tools: (argOf('--tools', '') || '').split(',').map(s => s.trim()).filter(Boolean),
   multiAgentApi: argOf('--multi-agent-api', 'none'),
+  denied: process.argv.includes('--denied'),
   framesPath: argOf('--frames', DEFAULT_FRAMES),
 })) + '\n');
 process.exit(0);
