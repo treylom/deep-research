@@ -173,6 +173,8 @@ export async function gate(target, selfAgents = SELF_AGENTS) {
       grade_basis: `robots.txt 차단 — ${verdict.rule}${verdict.matched_group ? ` [User-agent: ${verdict.matched_group}]` : ''} (우회하지 않음)`,
       accessed_at: new Date().toISOString(),
       status: 'unreachable',
+      // 이 게이트가 내는 미도달은 **차단**이다 — 시한 내 미추적(`not-traced`)과 같은 칸에 담기지 않는다.
+      unreachable_reason: 'blocked',
     };
   }
   return out;

@@ -20,7 +20,11 @@ const REQUIRED = [
   'schema_version', 'run_id', 'frame_id', 'source_id',
   'url', 'claim', 'grade', 'grade_basis', 'accessed_at', 'status',
 ];
-const OPTIONAL = new Set(['verbatim', 'discard_reason']);
+const OPTIONAL = new Set(['verbatim', 'discard_reason', 'unreachable_reason']);
+// UNREACHABLE 은 **두 사실을 한 이름으로 덮고 있었다** — 차단당해 못 갔는가(존중해 멈춤),
+// 시한 안에 못 쫓았는가(시간을 더 주면 풀림). 처분이 다르다.
+// 실측으로 걸렸다(AC8 RUN2): 워커가 enum 으로 못 적으니 그 구분을 **산문에** 넣었다.
+const UNREACHABLE_REASONS = new Set(['blocked', 'not-traced']);
 
 // sf-<YYYYMMDDTHHMMSSZ>-<4hex>
 const RUN_ID = /^sf-\d{8}T\d{6}Z-[0-9a-f]{4}$/;
@@ -84,6 +88,16 @@ export function validateLedger(text) {
     if (rec.status === 'discarded' && (typeof rec.discard_reason !== 'string' || rec.discard_reason === '')) {
       violations.push(`${lineNo}: status=discarded 면 discard_reason 필수`);
     }
+    // grade=UNREACHABLE 은 사유 축을 반드시 갖는다 — 없으면 "차단"과 "미추적"이 한 이름에 묻힌다.
+    if (rec.grade === 'UNREACHABLE') {
+      if (!('unreachable_reason' in rec)) {
+        violations.push(`${lineNo}: grade=UNREACHABLE 면 unreachable_reason 필수 — ${[...UNREACHABLE_REASONS].join('|')} (차단당한 것과 시한 내 못 쫓은 것은 다른 사실이고 처분이 다르다)`);
+      } else if (!UNREACHABLE_REASONS.has(rec.unreachable_reason)) {
+        violations.push(`${lineNo}: unreachable_reason enum 위반 — ${[...UNREACHABLE_REASONS].join('|')} (받은 값: ${JSON.stringify(rec.unreachable_reason)})`);
+      }
+    } else if ('unreachable_reason' in rec) {
+      violations.push(`${lineNo}: unreachable_reason 은 grade=UNREACHABLE 일 때만 쓴다 (받은 grade: ${JSON.stringify(rec.grade)})`);
+    }
     if (typeof rec.source_id === 'string' && rec.source_id !== '') {
       const first = seenSourceIds.get(rec.source_id);
       if (first !== undefined) {
@@ -115,12 +129,15 @@ function selfTest() {
   });
 
   const invalid = validateLedger(readFileSync(join(fx, 'ledger-invalid.jsonl'), 'utf8'));
-  // 음성 fixture 가 담고 있는 4종이 각각 잡히는지 — 총 건수가 아니라 종류로 본다
+  // 음성 fixture 가 담고 있는 6종이 각각 잡히는지 — 총 건수가 아니라 종류로 본다
   const kinds = {
     '필수필드 누락': /필수필드 누락/,
     'enum 위반': /enum 위반/,
     'source_id 중복': /source_id 중복/,
     'malformed line': /malformed line/,
+    // UNREACHABLE 의 사유 축 — 없으면 "차단"과 "미추적"이 한 이름에 묻힌다.
+    'UNREACHABLE 사유 누락': /unreachable_reason 필수/,
+    'UNREACHABLE 아닌데 사유 붙음': /unreachable_reason 은 grade=UNREACHABLE 일 때만/,
   };
   for (const [label, re] of Object.entries(kinds)) {
     results.push({

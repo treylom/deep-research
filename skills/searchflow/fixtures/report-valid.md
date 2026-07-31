@@ -73,3 +73,7 @@ node scripts/robots-gate.mjs <s004 URL>           → exit 1 (blocked, Disallow:
 - `parallelism=sequential` · `tier=sequential` · `degraded=no-orchestration-tool` — 이 실행 환경에 병렬 오케스트레이션 도구가 없어 축을 순차로 조사했다. **지지 축과 반증 축은 순차에서도 별개 조사 단위로 유지**했다.
 - `cross-engine=not-run` — 교차 엔진 검증 미수행(enhanced 층 부재).
 - 브라우저 도구 부재로 취득 사다리 3단을 건너뛰었다.
+
+## 점수 지위
+
+**점수 체계 = 잠정(held-out 미검증)** — 아래 축 점수·총점은 이 공정 내부의 상대적 자기평가이며, 등급 가중치·문턱은 독립 세트 검증 전이다. 실측 지표로 인용하면 오귀속이다. 확정 경로 = AC6 도메인 테스트 3종의 실채점 데이터.
