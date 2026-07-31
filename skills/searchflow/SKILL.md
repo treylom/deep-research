@@ -136,9 +136,17 @@ node scripts/hide-check.mjs <조립된 프롬프트 파일>...
 
 ### Claude Code (3단 폴백)
 
-1. 병렬 오케스트레이션 도구가 있으면 그것으로 축별 병렬
-2. 없으면 서브에이전트(읽기 전용 조사)로 축별 병렬
-3. 둘 다 없으면 **순차 실행** + 보고서에 `parallelism=sequential` 격하 라벨
+| 순위 | 경로 | 조건 | tier 라벨 |
+|---|---|---|---|
+| 1 | **`Workflow` 도구** — 축별 워커를 한 스크립트로 팬아웃 | 리드 자기 tool surface 에 `Workflow` 노출 | `cc-workflow` |
+| 2 | **서브에이전트**(`Task`/`Agent` — 읽기 전용 조사) 축별 병렬 | 1단 부재, `Task` 또는 `Agent` 노출 | `cc-subagent` |
+| 3 | **순차 실행** + 격하 라벨 | 둘 다 부재 | `sequential` |
+
+🔴 **1단 도구 이름을 여기 적어두는 것 자체가 배선이다.** 하네스가 병렬 도구에 *사용자 명시 opt-in* 을 요구하는 경우, 그 조건 중 하나가 **"스킬의 지시가 그 도구를 부르라고 할 때"** 다. 이름을 안 적으면 도구가 있어도 리드가 자제해 2단으로 내려가고, **그 강등은 라벨 없이 일어난다**(성능은 떨어지는데 보고서에는 흔적이 없다). 그래서 1단은 이름으로 지목한다.
+
+**부재 판정은 리드가 자기 tool surface 로 한다.** `env-detect.mjs` 의 값은 참고용이다 — shell 프로세스는 모델의 도구 노출을 대신 판정할 수 없다.
+
+> 실측 참고(2026-07, CLI 2.1.220 · headless): 플러그인·설정·MCP 전부 0인 프로필에서도 `Workflow` 는 기본 도구 목록에 있었고 실호출도 됐다. 즉 3단 폴백의 1단은 통상 실재한다. 반면 CLI 의 **최소 모드(`--bare`)에는 1·2단이 동시에 없었다** — 3단은 이론적 바닥이 아니라 실재 경로다(`fixtures/ac9-degrade-bare.sh`). 버전 의존일 수 있으므로 그 fixture 는 버전 스탬프를 들고 있다.
 
 ### Codex CLI (capability adapter)
 
@@ -153,6 +161,22 @@ node scripts/hide-check.mjs <조립된 프롬프트 파일>...
 - run 종료 시 goal 을 **close/complete 로 명시 종결**한다. 방치된 goal 이 다음 run 의 충돌 원인이 된다.
 
 **순차 강등은 프레임을 합치지 않는다.** 특히 `factcheck` 의 지지/반증 축은 순차에서도 별개 조사 단위로 유지한다(편향 차단 장치 — `frames.md` §2).
+
+### 경로 등가 — 기계로 강제한다
+
+tier 는 **실행 방식과 라벨만** 바꾼다. 조사 단위 집합은 어느 tier 에서도 같아야 한다. 눈으로 지키지 않고 스크립트로 고정한다:
+
+```bash
+node scripts/spawn-plan.mjs --type <유형[,유형2]> --harness cc --tools "<리드가 실제로 보는 도구 이름들>"
+node scripts/spawn-plan.mjs --type <유형>          --harness codex --multi-agent-api public|collab_v2|none
+# stdout: {"harness":…,"tier":…,"parallelism":…,"units":[{frame_id,type,axis}…],"labels":[…],"dedupe_required":bool}
+# exit 0=계획 · 1=입력 계약 위반 · 2=스크립트 오류(통과 취급 ❌)
+node scripts/spawn-plan.mjs --test   # 경로 등가·순차 분리 유지·상한·폴백·음성 대조
+```
+
+- 유형→축 표의 **유일 SoT 는 `references/frames.md` §2** 다. 스크립트는 그것을 파싱한다 — 표를 코드에 복제하지 않는다(이중 관리는 한쪽만 갱신되는 순간 조용히 갈린다).
+- `dedupe_required:true` = 복합 유형이다. **의미적 중복 접기는 기계가 못 한다** → 리드가 `frames.md` §1 결합규칙 2 를 적용하고, 접은 축을 「관찰 범위 선언」에 적는다.
+- `labels` 를 보고서 「환경·한계」 칸에 **그 문자열 그대로** 옮긴다. 문자열이 바뀌면 격하 여부를 기계로 확인할 수 없게 된다.
 
 ## 4. 질문 주체 = 리드 일괄
 
@@ -171,7 +195,17 @@ node scripts/hide-check.mjs <조립된 프롬프트 파일>...
 3. 답 대기 중 **다른 프레임은 독립 진행**
 4. 답 수신 시 §3 경로로 주입해 재개
 
-**relay envelope**: `{run_id, frame_id, question_id, round, status}` — `status` 전이 = `pending → asked → answered → resumed`, 각 전이는 리드만 기록.
+**relay envelope**: `{run_id, frame_id, question_id, round, status}` — `status` 전이 = `pending → asked → answered → resumed`, 각 전이는 리드만 기록. 기록 위치 = `out/relay.jsonl`(리드 single-writer, 원장과 같은 규율).
+
+```bash
+node scripts/relay-check.mjs out/relay.jsonl
+# stdout: {run_id,records,questions,frames,efup:[…],in_flight:[…],violations:[…]}
+# exit 0=위반 0 · 1=위반(빈 원장 포함 — 0건은 통과가 아니다) · 2=스크립트 오류
+node scripts/relay-check.mjs --test   # 양성 + 음성 5종 + exit 계약
+```
+
+**완료 워커 재진입(E-FUP)**: 어떤 축의 라운드 1 주기가 `resumed` 까지 끝난 뒤 그 축에 라운드 2 질문이 열리면, 리드는 그 워커를 **재스폰하지 않고 재진입**시킨다(`collab_v2` 는 `followup_task`). 재스폰하면 라운드 1에서 이미 읽은 것을 다시 읽는다. `relay-check` 의 `efup` 배열이 원장에 그 형태가 남았는지 확인한다.
+⚠️ 그 검사는 **원장의 형태**를 재는 것이고 런타임이 실제로 재진입했는지를 재는 것이 아니다 — GREEN 을 "재진입이 동작한다"로 인용하지 않는다.
 
 ### 비대화 실행 (질문 채널 없음)
 
@@ -210,6 +244,7 @@ node scripts/hide-check.mjs <조립된 프롬프트 파일>...
 
 - `out/report.md` — `references/report-contract.md` 의 칸 목록 전건
 - `out/sources.jsonl` — schema v1 (리드 single-writer, `grade-ledger.mjs` 통과)
+- `out/relay.jsonl` — 사용자 질문 릴레이 원장 (리드 single-writer, `relay-check.mjs` 통과). 질문이 0건이었으면 이 파일은 만들지 않는다 — **빈 파일을 남기지 않는다**(검사기가 빈 원장을 위반으로 잡는다).
 
 ## 9. 공개 안전
 
