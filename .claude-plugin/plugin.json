@@ -1,7 +1,7 @@
 {
-  "name": "deep-research",
-  "description": "7-Phase multi-source deep research engine with source verification, cross-validation, and inline citations.",
-  "version": "2.1.1",
+  "name": "searchflow",
+  "description": "Research pipeline that decides depth after the evidence: source-grade weighted scoring, worker-hidden thresholds, and type-driven investigation frames.",
+  "version": "3.0.0",
   "author": {
     "name": "tofukyung",
     "url": "https://github.com/treylom"
@@ -10,6 +10,7 @@
   "repository": "https://github.com/treylom/deep-research",
   "license": "MIT",
   "keywords": [
+    "searchflow",
     "deep-research",
     "fact-checking",
     "source-verification",
