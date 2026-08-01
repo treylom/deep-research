@@ -142,6 +142,18 @@ function scoreFrame(sources) {
   return { total, usable: used.length };
 }
 
+/**
+ * 문자열에서 **독립한 수 토큰**만 뽑는다 — 앞뒤가 글자·밑줄·점이면 수로 세지 않는다.
+ * 별도 함수인 이유: 이 경계 판정이 거짓 RED 의 진원지라 **고정 문자열로 직접 재기** 위해서다.
+ */
+export function numericTokens(txt) {
+  // `\w` 는 ASCII 만 본다 — 그러면 `P2`·`f1` 은 걸러지는데 **`3종` 은 안 걸러진다**(자체 테스트가 잡았다).
+  // 규칙을 문자 체계와 무관하게 통일한다: **글자에 붙은 숫자는 토큰의 일부지 수가 아니다.**
+  // ⚠️ 남는 한계: 통과선과 같은 값이 문안에 **띄어쓴 맨숫자**로 나오면 구별할 방법이 없다
+  //    (예: 통과선 3 · 문안 "출처 3 곳"). 어휘로는 못 가르는 충돌이라 여기서 닫지 않는다.
+  return (String(txt).match(/(?<![\p{L}\p{N}_.])\d+(?:\.\d+)?(?![\p{L}\p{N}_.])/gu) || []).map(Number);
+}
+
 /** 응답 직전 기계 검사 — 은닉 규율을 사람 기억에 맡기지 않는다. */
 function assertNoLeak(payload) {
   const seen = [];
@@ -155,8 +167,18 @@ function assertNoLeak(payload) {
     }
   })(payload);
   const txt = JSON.stringify(payload);
-  // 통과선 리터럴이 문자열로 새는 경우까지(예: "1.6 넘었습니다")
-  if (txt.includes(String(THRESHOLD))) seen.push(`literal:${THRESHOLD}`);
+  // 통과선 리터럴이 문자열로 새는 경우까지(예: "1.6 넘었습니다").
+  //
+  // ⚠️ 부분일치로 재면 **정수 통과선에서 거짓 RED** 가 난다 — 실측으로 걸렸다:
+  //    threshold 2 → 문안 "P2 제공 예정" 의 `2` / threshold 1 → `"frame_id":"f1"` 의 `1`.
+  //    정수는 L3 기준 스왑에 가장 자연스러운 값이라, 이대로 두면 스왑 회차에서
+  //    **게이트가 죽은 것을 "은닉 위반 검출" 로 오독**하게 된다. 거짓 RED 는 거짓 GREEN 만큼 나쁘다.
+  //    그래서 수 토큰 경계로 끊어 **수로 비교**한다(`P2`·`f1` 은 앞이 글자라 수 토큰이 아니다).
+  //
+  // 가중치 값은 여기서 재지 않는다 — `1.0`·`0` 은 문안의 평범한 수와 구별되지 않아
+  // 넣는 순간 이 검사기가 상시 거짓 RED 가 된다(= 무시되는 검사기 = 죽은 검사기).
+  // 그 축은 키 이름(`LEAK_KEYS`)과 별도 은닉 e2e 가 담당한다.
+  if (numericTokens(txt).some((n) => n === THRESHOLD)) seen.push(`literal:${THRESHOLD}`);
   if (seen.length) {
     throw new Error(`은닉 위반 — 응답에 채점 내부값이 실렸다: ${seen.join(',')}`);
   }
@@ -263,6 +285,29 @@ function toolSubmit(args) {
   return recordOutbound(session_id, 'searchflow_submit', { accepted: sources.length, frame_id, next: '남은 프레임을 제출하거나, 다 냈으면 searchflow_gate 를 호출한다.' });
 }
 
+/**
+ * 판정 1건을 내보내고, **나간 뒤에** 원장에 적는다.
+ *
+ * 순서가 반대면 원장이 사실과 어긋난다 — 실측으로 걸렸다: 누출 검사가 던지는 경로에서
+ * `gate` 는 적혔는데 `outbound` 가 없고 실패 기록도 없었다. 원장만 재생하면
+ * **"판정했고 전달됐다"** 로 읽히는데 워커는 그 판정을 받은 적이 없다.
+ * "주장이 아니라 원장" 이 이 설계의 근거인 이상, 원장은 **실패도 적어야 한다**.
+ *
+ * ⚠️ 여기서 보증하는 것은 "검사 통과 후 직렬화까지" 지 클라이언트 수신이 아니다(그건 전송 계층 몫).
+ */
+function emitGate(session_id, ledgerEvent, out) {
+  let payload;
+  try {
+    payload = assertNoLeak(out);
+  } catch (err) {
+    ledgerAppend(session_id, { event: 'gate_error', reason: err.message, withheld: ledgerEvent });
+    throw err;
+  }
+  const sent = recordOutbound(session_id, 'searchflow_gate', payload);
+  ledgerAppend(session_id, ledgerEvent);
+  return sent;
+}
+
 function toolGate(args) {
   const { session_id } = args;
   const led = ledgerRead(session_id);
@@ -281,8 +326,7 @@ function toolGate(args) {
   if (missing.length) {
     const out = { decision: 'incomplete', awaiting_frames: missing,
       guidance: '아직 제출되지 않은 프레임이 있다. 먼저 제출한다.' };
-    ledgerAppend(session_id, { event: 'gate', decision: out.decision, awaiting: missing });
-    return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
+    return emitGate(session_id, { event: 'gate', decision: out.decision, awaiting: missing }, out);
   }
 
   // 판정은 서버 안에서. 밖으로는 결론만.
@@ -293,16 +337,14 @@ function toolGate(args) {
   if (weak.length === 0) {
     const out = { decision: 'done',
       guidance: '근거가 충분하다. searchflow_report 로 보고서를 구성한다(P2 제공 예정 — 현재는 원장을 근거로 직접 작성).' };
-    ledgerAppend(session_id, { event: 'gate', decision: 'done', rounds: rounds + 1 });
-    return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
+    return emitGate(session_id, { event: 'gate', decision: 'done', rounds: rounds + 1 }, out);
   }
 
   if (rounds + 1 >= MAX_ROUNDS) {
     const out = { decision: 'done_with_gaps',
       weak_frames: weak.map((w) => w.fid),
       guidance: '재조사 상한에 도달했다. 부족한 프레임을 보고서에 **한계로 명시**하고 마무리한다 — 조용히 넘기지 말 것.' };
-    ledgerAppend(session_id, { event: 'gate', decision: out.decision, rounds: rounds + 1, weak: out.weak_frames });
-    return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
+    return emitGate(session_id, { event: 'gate', decision: out.decision, rounds: rounds + 1, weak: out.weak_frames }, out);
   }
 
   const target = weak[0];
@@ -311,8 +353,7 @@ function toolGate(args) {
     : '이 프레임은 근거가 원본에서 멀다 — 인용된 원문·1차 자료를 직접 열어 등급을 올린다.';
   const out = { decision: 'reinvestigate', frame_id: target.fid, guidance: reason,
     note: '가장 약한 프레임 하나만 다시 본다. 나머지는 그대로 둔다.' };
-  ledgerAppend(session_id, { event: 'gate', decision: 'reinvestigate', frame_id: target.fid, rounds: rounds + 1 });
-  return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
+  return emitGate(session_id, { event: 'gate', decision: 'reinvestigate', frame_id: target.fid, rounds: rounds + 1 }, out);
 }
 
 const DISPATCH = { searchflow_start: toolStart, searchflow_submit: toolSubmit, searchflow_gate: toolGate };
@@ -434,6 +475,34 @@ function selfTest() {
   let caughtLiteral = false;
   try { assertNoLeak({ decision: 'done', note: `통과선 ${THRESHOLD} 초과` }); } catch { caughtLiteral = true; }
   ok('누출 검사기 양성 대조(키·리터럴 둘 다)', caught && caughtLiteral);
+
+  // 12b 🔴 음성 대조 — 정수 통과선에서 **무고한 문자열**을 잡지 않는가 (거짓 RED 회귀)
+  //     외부 재검에서 걸린 실제 두 케이스를 고정 문자열로 박는다: `P2 제공 예정` · `"frame_id":"f1"`.
+  //     양성(위 12)만 있고 이 음성이 없으면 "잡는다"만 재고 "안 잡아야 할 것"은 미측정이다.
+  const negCases = [
+    ['P2 제공 예정', 2, '문안 안의 P2'],
+    ['{"frame_id":"f1"}', 1, '식별자 f1'],
+    ['도구 3종', 3, '문안 안의 3종'],
+  ];
+  const negBad = negCases.filter(([txt, n]) => numericTokens(txt).includes(n)).map(([, , why]) => why);
+  const posOk = numericTokens('통과선 1.6 초과').includes(1.6) && numericTokens('{"rounds":2}').includes(2);
+  ok('수 토큰 경계 — 무고한 문자열 미검출 + 진짜 수는 검출',
+     negBad.length === 0 && posOk,
+     negBad.length ? `거짓 RED: ${negBad.join(',')}` : `음성 ${negCases.length}건 통과 · 양성(1.6·bare 2) 검출`);
+
+  // 12c 🔴 원장이 **전달 실패를 적는가** (원장≠사실 회귀)
+  //     누출로 막힌 판정이 원장에 `gate` 로 남으면, 재생 시 "판정했고 전달됐다"로 읽힌다 —
+  //     워커는 받은 적이 없는데. 실패 경로에서 gate 0 · gate_error 1 · outbound 0 이어야 한다.
+  const sErr = S('원장 실패기록 세션');
+  const beforeLen = ledgerRead(sErr.session_id).length;
+  let threw = false;
+  try { emitGate(sErr.session_id, { event: 'gate', decision: 'done' }, { decision: 'done', score: 9 }); }
+  catch { threw = true; }
+  const tail = ledgerRead(sErr.session_id).slice(beforeLen);
+  const cnt = (ev) => tail.filter((e) => e.event === ev).length;
+  ok('누출로 막힌 판정 = gate_error 만 남고 gate·outbound 0',
+     threw && cnt('gate_error') === 1 && cnt('gate') === 0 && cnt('outbound') === 0,
+     `throw=${threw} gate_error=${cnt('gate_error')} gate=${cnt('gate')} outbound=${cnt('outbound')}`);
 
   // 13 원장이 실제로 쌓였는가
   const led = ledgerRead(s3.session_id);
