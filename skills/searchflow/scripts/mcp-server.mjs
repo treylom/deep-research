@@ -529,9 +529,14 @@ function selfTest() {
     ['통과선 1.6 초과', 1.6, '띄어쓴 소수'],
     ['{"rounds":2}', 2, 'JSON 맨숫자'],
     ['출처 3 곳', 3, '띄어쓴 정수'],
+    // 수량사 제외는 **정수에만** 건다 — 소수는 수량 표현이 아니므로 그대로 검출돼야 한다.
+    // (`2개` 는 빼고 `2.4개` 는 잡는다 = 제외 규칙이 값의 꼴로 좁혀져 있다는 증명)
+    ['2.4개', 2.4, '소수 + 수량사'],
+    ['통과선 2.4건', 2.4, '소수 + 수량사(문장)'],
   ];
   const posBad = posCases.filter(([txt, n]) => !numericTokens(txt).includes(n)).map(([, , why]) => why);
-  ok('수 토큰 — 한국어 양성 8건 검출 + 식별자·수량사 음성 5건 미검출',
+  // 갯수는 fixture 에서 뽑는다 — 이름에 손으로 적으면 케이스를 늘린 순간 그 숫자가 거짓말이 된다.
+  ok(`수 토큰 — 한국어 양성 ${posCases.length}건 검출 + 식별자·수량사 음성 ${negCases.length}건 미검출`,
      negBad.length === 0 && posBad.length === 0,
      [negBad.length ? `거짓 RED: ${negBad.join(',')}` : null,
       posBad.length ? `거짓 GREEN: ${posBad.join(',')}` : null,
@@ -579,6 +584,11 @@ function selfTest() {
   }
   process.stdout.write(`\n${results.length - failed}/${results.length} PASS\n`);
   process.stdout.write('참고: 실제 하네스 등록·왕복(2모드 e2e)은 이 --test 에 없다 — P3 소관.\n');
+  // 알려진 한계는 통과 화면에도 띄운다 — 주석에만 두면 "18/18" 만 읽고 닫힌 줄 안다.
+  process.stdout.write(
+    `알려진 한계: 통과선 리터럴 검사의 한글 수량사 목록은 **열린 집합**이다(현재 ${KO_COUNTER.source.split('|').length}종).\n` +
+    '  미등재 수량사 + 같은 값의 정수 통과선 = 거짓 RED (예: 통과선 3 · 문안 "3켤레"). 검출 쪽이라 안전한 방향이고,\n' +
+    '  목록에 조사·서술어를 넣으면 거짓 GREEN 이 되므로 넣지 말 것. 값 공간 쪽 이중 방어 = 기준 스왑 값을 소수로.\n');
   return failed === 0 ? 0 : 1;
 }
 
