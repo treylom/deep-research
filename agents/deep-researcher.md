@@ -1,14 +1,15 @@
 ---
 name: deep-researcher
 model: sonnet
-description: 딥리서치 수집/분석 에이전트 — Agent Teams 스폰용. 웹/학술 소스 수집, 교차검증, 합성, QA 역할 수행.
+description: "[DEPRECATED — do not spawn; SearchFlow runs without this agent] Superseded research worker kept only so that older spawn configs do not break."
 allowedTools: Read, Write, Glob, Grep, WebSearch, WebFetch, ToolSearch, TaskCreate, TaskUpdate, TaskList, SendMessage
 ---
 
 # Deep Researcher Agent
 
-> ⚠️ **DEPRECATED — 구 공정 워커.** 현행 정본 = `skills/searchflow/SKILL.md` (`/searchflow`).
-> 구 스폰 경로를 깨지 않기 위해 존치합니다. searchflow core 는 **순정 CLI + 번들만으로 완주**하는 것이 계약이라, 이 에이전트를 전제하지 않습니다.
+> ⚠️ **DEPRECATED — 구 공정 워커.** 지금 쓰는 것은 **`/searchflow`** 입니다(스킬 파일 = `skills/searchflow/SKILL.md`).
+> **SearchFlow 는 이 에이전트 없이도 동작합니다.** 예전 방식으로 이 워커를 스폰하던 설정이 있으면 계속 쓸 수 있도록 파일만 남겨 둡니다.
+> 이 파일을 언제 지울지는 아직 정하지 않았습니다 — 지울 때는 릴리스 노트로 먼저 알립니다.
 
 > /deep-research 커맨드에서 Agent Teams로 스폰되는 워커 에이전트.
 > 역할에 따라 수집, 교차검증, 합성, QA 중 하나를 수행합니다.

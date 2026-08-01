@@ -1,12 +1,13 @@
 ---
 name: deep-research-source-quality
-description: Use when needing a-E 소스 품질 등급 시스템 + IFCN 원칙 통합. /deep-research의 소스 신뢰도 평가 엔진.
+description: "[DEPRECATED — do not use; grading canon is `skills/searchflow/references/scoring.md`] Superseded A–E domain-whitelist source grading. Its criteria differ from the current 5 grades — mixing the two produces wrong scores."
 ---
 
 # Deep Research Source Quality
 
-> ⚠️ **DEPRECATED — 구 공정 문서.** 현행 정본 = `skills/searchflow/references/scoring.md` (`/searchflow`).
-> 등급 축이 다릅니다 — 구 A–E 는 **도메인 화이트리스트** 기반이고, 현행 `ORIGINAL|A|B|C|UNREACHABLE` 은 **"이 URL 이 그 주장에 대해 무엇인가"** 기반입니다. 두 체계를 섞어 쓰지 마세요.
+> ⚠️ **DEPRECATED — 구 공정 문서.** 현행은 **`/searchflow`** 입니다(등급 정본 = `skills/searchflow/references/scoring.md`).
+> 등급을 정하는 기준 자체가 다릅니다 — 구 A–E 는 **매체가 어디인가**(도메인 목록)로 정했고, 현행 5등급 **원Source · A급 · B급 · C급 · 사용불가** 는 **"이 URL 이 그 주장에 대해 무엇인가"** 로 정합니다. 같은 신문이라도 원문을 그대로 실으면 원Source, 해설이면 C 입니다.
+> 두 체계를 섞어 쓰지 마세요. 사람이 읽는 이름과 원장에 적히는 값의 대응은 `scoring.md` **§1-1 매핑 정본**에 있습니다.
 
 > 소스 품질 등급 시스템 — IFCN(International Fact-Checking Network) 원칙 통합.
 > /deep-research 파이프라인의 P2(수집), P3(교차검증), P5(QA)에서 사용.

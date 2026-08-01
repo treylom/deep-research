@@ -1,12 +1,13 @@
 ---
 name: deep-research-pipeline
-description: Use when needing 7-Phase 리서치 엔진 — 서브토픽 분해, 병렬 수집, 교차검증, 합성, QA. /deep-research 커맨드의 핵심 엔진.
+description: "[DEPRECATED — do not use; use the `searchflow` skill instead] Superseded 7-Phase research engine kept only so that older references do not break."
 ---
 
 # Deep Research Pipeline Engine
 
-> ⚠️ **DEPRECATED — 구 공정 문서.** 현행 정본 = `skills/searchflow/SKILL.md` (`/searchflow`).
-> 구 참조를 깨지 않기 위해 존치하며, 신규 작업은 searchflow 공정을 씁니다. 제거 시점 = 마이너 2회 후 별건 판단(`commands/deep-research.md` 와 같은 정책).
+> ⚠️ **DEPRECATED — 구 공정 문서.** 지금 쓰는 것은 **`/searchflow`** 입니다(스킬 파일 = `skills/searchflow/SKILL.md`).
+> 예전 문서를 가리키던 설정이 깨지지 않도록 파일만 남겨 둡니다. 새 작업은 SearchFlow 로 하세요.
+> 이 파일을 언제 지울지는 아직 정하지 않았습니다 — **지울 때는 릴리스 노트로 먼저 알립니다.**
 
 > `/deep-research` 커맨드의 핵심 파이프라인 스펙.
 > 서브토픽 분해 → 병렬 수집 → 교차검증 → 합성 → QA → 출력.

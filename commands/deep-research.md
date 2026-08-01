@@ -7,7 +7,7 @@ allowedTools: Agent, AskUserQuestion, Read, Write, Glob, Grep, WebSearch, WebFet
 
 # /deep-research — DEPRECATED
 
-> **이 명령은 `/searchflow` 로 대체되었습니다.** 구 호출을 깨지 않기 위해 얇은 리다이렉트로만 존치합니다. 제거 시점은 마이너 2회 후 별건 판단입니다.
+> **이 명령은 `/searchflow` 로 대체되었습니다.** 구 호출을 깨지 않기 위해 얇은 리다이렉트로만 존치합니다. 언제 지울지는 아직 정하지 않았고, **지울 때는 릴리스 노트로 먼저 알립니다.**
 
 ## 실행
 
