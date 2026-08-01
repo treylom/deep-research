@@ -147,12 +147,42 @@ function scoreFrame(sources) {
  * 별도 함수인 이유: 이 경계 판정이 거짓 RED 의 진원지라 **고정 문자열로 직접 재기** 위해서다.
  */
 export function numericTokens(txt) {
-  // `\w` 는 ASCII 만 본다 — 그러면 `P2`·`f1` 은 걸러지는데 **`3종` 은 안 걸러진다**(자체 테스트가 잡았다).
-  // 규칙을 문자 체계와 무관하게 통일한다: **글자에 붙은 숫자는 토큰의 일부지 수가 아니다.**
-  // ⚠️ 남는 한계: 통과선과 같은 값이 문안에 **띄어쓴 맨숫자**로 나오면 구별할 방법이 없다
-  //    (예: 통과선 3 · 문안 "출처 3 곳"). 어휘로는 못 가르는 충돌이라 여기서 닫지 않는다.
-  return (String(txt).match(/(?<![\p{L}\p{N}_.])\d+(?:\.\d+)?(?![\p{L}\p{N}_.])/gu) || []).map(Number);
+  // 규칙: **라틴 글자에 붙은 숫자만** 토큰(식별자·버전)으로 보고 수에서 뺀다.
+  //
+  // 여기까지 두 번 틀렸고, 방향이 서로 반대였다:
+  //   ① `\w`(ASCII) 경계 → `3종` 을 수로 세어 **거짓 RED**
+  //   ② `\p{L}`(글자 일반) 경계 → 한국어에서 거의 항상 발동해 **거짓 GREEN**.
+  //      `통과선은 1.6이다`·`합계 2.`·`임계값1.6` 이 전부 미검출이었다 — 우리 응답 문안이
+  //      전부 한국어라, 누가 여기에 통과선을 한 문장으로 적으면 그대로 통과했다.
+  //   ⇒ 은닉 검사기에서 **부족(거짓 GREEN)이 과잉(거짓 RED)보다 아프다.** 그래서 한글 인접은
+  //      수로 세고, 라틴 인접만 뺀다(`f1`·`P2`·`v1.6.0`·`ac6-compare` 는 식별자다).
+  //
+  // ⚠️ 알고 받는 대가: **정수 통과선 + 한글 수량사**는 거짓 RED 가 난다(threshold 3 · 문안 `3종`).
+  //    이건 우리가 통제하는 조건이다 — 응답 문안에 맨숫자를 쓰지 않으면 안 난다(현재 0개).
+  //    반대로 거짓 GREEN 은 *앞으로 누가 어떻게 쓰느냐*에 달려 통제 밖이다. 통제 가능한 쪽으로 위험을 옮긴다.
+  //
+  // 가중치 값은 여전히 대상 밖 — `1.0`·`0` 은 평범한 수와 구별되지 않아 상시 거짓 RED 가 된다.
+  const s = String(txt);
+  const out = [];
+  for (const m of s.matchAll(/\d+(?:\.\d+)*/g)) {
+    const before = s[m.index - 1] ?? '';
+    const rest = s.slice(m.index + m[0].length);
+    if (/[A-Za-z_]/.test(before) || /^[A-Za-z_]/.test(rest)) continue;  // 식별자·버전 (f1·P2·ac6)
+    if (m[0].split('.').length > 2) continue;                            // 1.6.0 = 버전 문자열
+    // 정수 + **한글 수량사**만 뺀다 — `3종`·`2개` 는 세는 말이지 통과선이 아니다.
+    // 조사(`2이다`)는 여기 안 걸리므로 그대로 검출된다 ← 이게 위 ②를 닫는 지점.
+    if (Number.isInteger(Number(m[0])) && KO_COUNTER.test(rest)) continue;
+    out.push(Number(m[0]));
+  }
+  return out;
 }
+
+/**
+ * 한글 수량사(세는 말) — 정수 바로 뒤에 붙었을 때만 "수가 아니라 수량 표현"으로 본다.
+ * ⚠️ 이 목록은 완전하지 않다. 빠진 수량사는 **검출 쪽으로** 떨어진다(거짓 RED) — 안전한 방향이다.
+ *    반대로 여기에 조사·서술어를 넣으면 거짓 GREEN 이 되므로 넣지 말 것.
+ */
+const KO_COUNTER = /^(종|개|명|곳|건|회|차|장|번|가지|부|줄|배|쪽|권|판|기)/;
 
 /** 응답 직전 기계 검사 — 은닉 규율을 사람 기억에 맡기지 않는다. */
 function assertNoLeak(payload) {
@@ -482,13 +512,30 @@ function selfTest() {
   const negCases = [
     ['P2 제공 예정', 2, '문안 안의 P2'],
     ['{"frame_id":"f1"}', 1, '식별자 f1'],
-    ['도구 3종', 3, '문안 안의 3종'],
+    ['도구 3종', 3, '수량사 3종'],
+    ['v1.6.0 배포', 1.6, '버전 v1.6.0'],
+    ['ac6-compare', 6, '파일명 ac6'],
   ];
   const negBad = negCases.filter(([txt, n]) => numericTokens(txt).includes(n)).map(([, , why]) => why);
-  const posOk = numericTokens('통과선 1.6 초과').includes(1.6) && numericTokens('{"rounds":2}').includes(2);
-  ok('수 토큰 경계 — 무고한 문자열 미검출 + 진짜 수는 검출',
-     negBad.length === 0 && posOk,
-     negBad.length ? `거짓 RED: ${negBad.join(',')}` : `음성 ${negCases.length}건 통과 · 양성(1.6·bare 2) 검출`);
+
+  // 🔴 한국어 문장형 양성 — 여기가 비어 있으면 검사기는 **한국어에서 아무것도 못 잡는다**.
+  //    우리 응답 문안(guidance·note)이 전부 한국어라 이 축이 실사용 축이다.
+  const posCases = [
+    ['통과선은 1.6이다', 1.6, '조사 직결'],
+    ['합계 2.', 2, '문장 끝 마침표'],
+    ['통과선은 1.6.', 1.6, '소수 + 마침표'],
+    ['임계값1.6', 1.6, '앞이 한글'],
+    ['통과선은 2이다', 2, '정수 + 조사'],
+    ['통과선 1.6 초과', 1.6, '띄어쓴 소수'],
+    ['{"rounds":2}', 2, 'JSON 맨숫자'],
+    ['출처 3 곳', 3, '띄어쓴 정수'],
+  ];
+  const posBad = posCases.filter(([txt, n]) => !numericTokens(txt).includes(n)).map(([, , why]) => why);
+  ok('수 토큰 — 한국어 양성 8건 검출 + 식별자·수량사 음성 5건 미검출',
+     negBad.length === 0 && posBad.length === 0,
+     [negBad.length ? `거짓 RED: ${negBad.join(',')}` : null,
+      posBad.length ? `거짓 GREEN: ${posBad.join(',')}` : null,
+     ].filter(Boolean).join(' / ') || `양성 ${posCases.length} · 음성 ${negCases.length} 전건 통과`);
 
   // 12c 🔴 원장이 **전달 실패를 적는가** (원장≠사실 회귀)
   //     누출로 막힌 판정이 원장에 `gate` 로 남으면, 재생 시 "판정했고 전달됐다"로 읽힌다 —
