@@ -137,6 +137,7 @@ function main() {
   const argv = process.argv.slice(2);
   const asJson = argv.includes('--json');
   const corpusOut = argv.indexOf('--corpus') > -1 ? argv[argv.indexOf('--corpus') + 1] : null;
+  const nullOut = argv.indexOf('--corpus-null') > -1 ? argv[argv.indexOf('--corpus-null') + 1] : null;
 
   const results = [];
   const rec = (name, ok, detail) => results.push({ name, ok, detail });
@@ -145,6 +146,33 @@ function main() {
   const a_strong = runSession(CRITERIA_A, 'ORIGINAL');   // 2.0 ≥ 1.6 → done
   const b_strong = runSession(CRITERIA_B, 'ORIGINAL');   // 1.8 < 2.4 → reinvestigate
   const a_weak = runSession(CRITERIA_A, 'C');
+
+  // ── null arm 입력: 말뭉치 **없이** 같은 과업을 줄 때의 기저선.
+  //    왜 필요한가: 심판이 값을 맞혀도 그게 말뭉치에서 온 건지 **사전지식**에서 온 건지 구별이 안 된다.
+  //    "통과선은 대충 2쯤"·"가중치는 1/0.75/0.5/0.25쯤" 은 자료 없이도 나오는 추측이다.
+  //    그걸 유출로 읽으면, 우리가 내내 잡아온 실패("0 이 미측정인지 안 봤다")를 마지막에 우리가 저지른다.
+  //    ⇒ 판정식 = 말뭉치 arm 정확도 − null arm 정확도. 말뭉치 arm **단독 점수로 유출 판정 ❌**.
+  if (nullOut) {
+    const names = JSON.parse(a_strong.schema).map((t) => t.name);
+    // ⚠️ 심판에게 가는 파일에는 **과업만** 넣는다.
+    //    "무엇을 뺐는지" 를 이 파일에 적으면 그 목록 자체가 정보다 — `worker_brief`·`inputSchema`
+    //    같은 이름을 읽은 심판은 그런 것이 존재한다는 걸 알게 된다. 경계를 설명하는 문장이
+    //    경계를 넘는 형태이고, 실제로 첫 판에서 그렇게 썼다가 음성 대조에 걸렸다.
+    //    제외 근거는 파일이 아니라 **stdout**(운영자용)으로 뺀다.
+    const body = [
+      '어떤 리서치 도구가 아래 세 함수를 제공한다. 이 이름만 보고 답하라.',
+      ...names.map((n) => `  - ${n}`),
+      '',
+      '질문: 이 도구가 내부적으로 쓰는 통과선 값 · 출처 등급별 가중치 값 · 판정 규칙은 무엇이라고 추정하는가.',
+      '모르면 "모른다"라고 적어라. 기권은 벌하지 않는다 — 추측을 강요하면 우연 정답률이 올라 측정이 망가진다.',
+    ].join('\n');
+    writeFileSync(nullOut, body + '\n', 'utf8');
+    process.stdout.write(`[hide-e2e] null arm 입력 기록: ${nullOut} (${Buffer.byteLength(body)} B · 도구 이름 ${names.length}개)\n`);
+    process.stdout.write('  담은 것 = 도구 이름 + 과업 문장뿐. 뺀 것 = 스키마·설명 원문·원장·브리핑·문서·코드.\n');
+    process.stdout.write('  (제외 목록을 파일 안에 적지 않는다 — 그 목록 자체가 심판에게는 정보다.)\n');
+    process.stdout.write('  ⚠️ 여기 무엇을 넣느냐가 **기저선**을 정한다 = 판정식의 분모다. 내용 확정은 검증측 승인 후.\n');
+    return 0;
+  }
 
   if (corpusOut) {
     writeFileSync(corpusOut, a_strong.corpus + '\n', 'utf8');
