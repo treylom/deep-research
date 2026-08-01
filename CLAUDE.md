@@ -47,6 +47,38 @@ node ~/.claude/skills/searchflow/scripts/env-detect.mjs
 
 **종료 코드**: 위처럼 **인자 없이 실행하는 설치 확인은 항상 0** 입니다(없음을 오류가 아니라 값으로 표현합니다). 다만 **`--test`(자체 테스트)만은 실패 시 1** 을 냅니다 — 이쪽은 "부재"가 아니라 "검사기가 깨졌다"는 뜻이라 0으로 덮으면 안 됩니다.
 
+## MCP 서버 (선택 — 공정을 하네스 밖에서 강제)
+
+`skills/searchflow/scripts/mcp-server.mjs` 는 조사→제출→판정을 **서버가 쥐는** stdio MCP 서버입니다. 없어도 스킬 단독으로 완주하고(2층 계약), 있으면 채점 기준이 조사 워커의 컨텍스트에 **아예 안 실립니다**.
+
+**Claude Code** — 플러그인으로 설치하면 동봉된 `.mcp.json` 이 자동으로 잡습니다. 수동 등록은:
+
+```json
+{ "mcpServers": { "searchflow": {
+  "command": "node",
+  "args": ["<이 저장소 경로>/skills/searchflow/scripts/mcp-server.mjs"] } } }
+```
+
+**Codex CLI** — `~/.codex/config.toml` 에 **절대 경로**로 적습니다(플러그인 루트 변수는 없습니다):
+
+```toml
+[mcp_servers.searchflow]
+command = "node"
+args = ["/절대/경로/skills/searchflow/scripts/mcp-server.mjs"]
+```
+
+> ⚠️ Codex 쪽 등록은 **아직 실기동 확인 전**입니다(설계 문서 P1 잔여). 위 형태는 같은 파일에 이미 등록된 다른 서버들의 실제 표기를 따른 것이고, 왕복 확인은 P3 에서 합니다.
+
+**동작 확인** — 서버는 줄 단위 JSON-RPC 를 씁니다:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node skills/searchflow/scripts/mcp-server.mjs
+```
+
+도구 3종(`searchflow_start`·`searchflow_submit`·`searchflow_gate`)이 나오면 정상입니다. 자체 테스트는 `--test`(실패 시 종료 코드 1).
+
+**세션 원장**은 저장소 밖에 씁니다 — 기본 `~/.searchflow/sessions/`, `SEARCHFLOW_STATE_DIR` 로 바꿀 수 있습니다.
+
 ## 사용법
 
 ```
