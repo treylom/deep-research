@@ -75,7 +75,7 @@ function stateDir() {
   const env = process.env.SEARCHFLOW_STATE_DIR;
   const base = env ? resolve(env) : join(homedir(), '.searchflow');
   // mode 0o700 — 원장에는 어떤 출처를 어떻게 판정했는지가 남는다. 같은 기계의 다른 프로세스가
-  // 읽을 수 있으면 "안 보낸다"만 지킨 반쪽 격리다(코난 ③).
+  // 읽을 수 있으면 "안 보낸다"만 지킨 반쪽 격리다.
   try { mkdirSync(join(base, 'sessions'), { recursive: true, mode: 0o700 }); return join(base, 'sessions'); }
   catch { const t = join(tmpdir(), 'searchflow-sessions'); mkdirSync(t, { recursive: true, mode: 0o700 }); return t; }
 }
