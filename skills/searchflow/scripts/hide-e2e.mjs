@@ -62,6 +62,7 @@ function runSession(criteria, grade) {
   const [started] = rpc(env, [{ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'searchflow_start', arguments: { question: '이 주장이 사실인가' } } }]);
   const startBody = JSON.parse(started.result.content[0].text);
   const sid = startBody.session_id;
+  const briefs = startBody.frames.map((f) => f.worker_brief).filter(Boolean);
 
   const src = [{ url: 'https://a', grade, status: 'used' }, { url: 'https://b', grade, status: 'used' }];
   const seq = startBody.frames.map((f, i) => ({
@@ -83,10 +84,20 @@ function runSession(criteria, grade) {
   rmSync(dir, { recursive: true, force: true });
   return {
     decision,
+    briefs,
     schema: JSON.stringify(listed.result.tools),
     outbound,
     corpus: [JSON.stringify(listed.result.tools), ...outbound].join('\n'),
   };
+}
+
+/** 조립물을 임시 파일로 떨어뜨려 hide-check 에 넘긴다 — 그 도구는 경로를 받는다(문자열 ❌). */
+function hideCheck(text) {
+  const f = join(mkdtempSync(join(tmpdir(), 'hide-s1-')), 'brief.txt');
+  writeFileSync(f, text, 'utf8');
+  const p = spawnSync('node', [join(HERE, 'hide-check.mjs'), f], { encoding: 'utf8' });
+  rmSync(dirname(f), { recursive: true, force: true });
+  return { rc: p.status, out: (p.stdout || '') + (p.stderr || '') };
 }
 
 /**
@@ -139,6 +150,10 @@ function main() {
     writeFileSync(corpusOut, a_strong.corpus + '\n', 'utf8');
     process.stdout.write(`[hide-e2e] L2 심판용 말뭉치 기록: ${corpusOut} (${Buffer.byteLength(a_strong.corpus)} B)\n`);
     process.stdout.write('  이 파일이 워커가 볼 수 있었던 전부다. 여기서 가중치·통과선을 복원할 수 있으면 L2 실패다.\n');
+    process.stdout.write(
+      '  ⚠️ 심판은 **기준을 모르는 쪽**이어야 한다. 값을 이미 아는 사람이 "복원 못 했다"고 말하면\n' +
+      '     그 기억이 오염원이라 증거가 되지 않는다. 그래서 이 스크립트가 재는 것은 "값·규칙 문자열이\n' +
+      '     말뭉치에 없다"(① 결정적)까지고, **L2 는 맹검 심판 n회 전까지 미측정**이다.\n');
     return 0;
   }
 
@@ -173,6 +188,20 @@ function main() {
   rec('L1 양성 대조 — 값을 심으면 잡는다',
       l1Report(planted, CRITERIA_A).violations.length > 0,
       `심은 값 ${CRITERIA_A.threshold}`);
+
+  // ── S1: **조립된 워커 프롬프트**를 hide-check 로 검사한다.
+  //    그전까지 S1 은 "조립물이 존재하지 않아" 미측정이었다 — 리드가 프레임을 받아 문장을 지어냈고,
+  //    지어낸 문자열은 어디에도 안 남으니 잴 대상이 없었다. 서버가 brief 전문을 주면서 대상이 생겼다.
+  //    ⚠️ 여기서 재는 것은 **MCP 경로의 조립물**이다. 스킬 §P2.5 조립문은 다른 표면이고 별도 측정이다.
+  const briefs = a_strong.briefs;
+  if (!briefs.length) die(2, 'worker_brief 가 없다 — S1 대상이 존재하지 않는다(미측정과 통과를 구분해야 한다)');
+  const s1 = hideCheck(briefs.join('\n\n'));
+  rec(`S1 조립된 워커 브리핑에 리드 전용 층 0 (프레임 ${briefs.length}개)`,
+      s1.rc === 0, s1.rc === 0 ? `${briefs.join('').length}자 검사 · hide-check rc=0` : s1.out.trim().split('\n').slice(-3).join(' / '));
+
+  // S1 양성 대조 — 브리핑에 기준을 심으면 hide-check 가 막는가. 안 막으면 위 rc=0 은 미측정이다.
+  const s1pos = hideCheck(`${briefs[0]}\n합격 문턱 0.75 를 넘겨라.`);
+  rec('S1 양성 대조 — 브리핑에 기준을 심으면 hide-check 가 막는다', s1pos.rc === 1, `rc=${s1pos.rc}`);
 
   // ── 순서 함의는 **실제로 나간다**. 위반은 아니지만 "안 보인다" 고 적으면 거짓이다.
   //    워커는 등급의 서열(ORIGINAL > A > B > C)을 복원할 수 있다 — 크기와 통과선은 못 한다.

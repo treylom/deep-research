@@ -241,6 +241,7 @@ const TOOLS = [
       properties: {
         question: { type: 'string', description: 'The question to research or claim to verify' },
         salt: { type: 'string', description: 'Optional disambiguator when starting two sessions on the same question' },
+        deadline: { type: 'string', description: 'Wall-clock cutoff to hand each worker, e.g. "20 minutes from now". Workers return partial results at the cutoff.' },
       },
       required: ['question'],
     },
@@ -285,11 +286,46 @@ const TOOLS = [
   },
 ];
 
+/**
+ * 워커에게 그대로 건네는 브리핑 **전문**. SKILL.md §P2.5 템플릿의 서버판.
+ *
+ * 왜 서버가 이걸 만드는가 — 두 가지가 한 번에 풀린다:
+ *   ① **은닉이 리드의 규율에 안 걸린다.** 리드가 프레임만 받아 문장을 지어내면, 늘어난 문장이
+ *      수치를 실어 나른다(§P2.5 가 "문장을 늘리지 않는다"고 적어둔 이유). 서버가 완성문을 주면
+ *      리드가 지어낼 자리가 없다.
+ *   ② **S1 이 측정 가능해진다.** 여기서 나간 문자열이 원장에 verbatim 으로 남으므로,
+ *      "조립된 워커 프롬프트에 기준이 있나" 를 주장이 아니라 **바이트로** 잴 수 있다.
+ *      그전까지 S1 은 조립물이 아예 존재하지 않아 미측정이었다.
+ *
+ * ⚠️ 이 함수 안에 채점 어휘·수치를 쓰지 말 것. 여기가 워커 컨텍스트의 입구다.
+ */
+function workerBrief(question, frameId, focus, deadline) {
+  return [
+    `질의: ${question}`,
+    `담당 축: ${frameId} — ${focus}`,
+    '당신은 이 축만 조사한다. 다른 축은 다른 조사자가 맡고 있고, 그쪽 산출은 보지 않는다.',
+    '',
+    '취득: 공개된 경로만 쓴다. robots.txt·이용약관·페이월·자동입력 방지는 우회하지 않는다 — 못 읽었으면 못 읽었다고 적는다.',
+    '  2차 자료를 근거로 쓸 때는 원본 링크 추적을 1회 시도하고, 실패하면 "원본 미도달"이라 적는다.',
+    '',
+    '제출: 본 출처를 **버린 것까지 전부** searchflow_submit 으로 낸다.',
+    '  url · grade(ORIGINAL|A|B|C|UNREACHABLE = 그 URL 이 주장에 대해 무엇인가)',
+    '  · status(used|discarded|unreachable = 당신이 그걸로 무엇을 했나) · 버렸으면 사유.',
+    '  얼마나 모으면 되는지는 당신이 정하지 않는다. 다 내고 나면 서버가 판정한다.',
+    '',
+    `마감: ${deadline}. 도달하면 그 시점 산출을 그대로 낸다(미완도 낸다).`,
+  ].join('\n');
+}
+
 function toolStart(args) {
   const q = String(args.question || '').trim();
   if (!q) throw new Error('question 이 비어 있다');
   const type = routeType(q);
-  const frames = TYPES[type].map((label, i) => ({ frame_id: `f${i + 1}`, focus: label }));
+  const deadline = String(args.deadline || '리드가 지정한 시각');
+  const frames = TYPES[type].map((label, i) => {
+    const fid = `f${i + 1}`;
+    return { frame_id: fid, focus: label, worker_brief: workerBrief(q, fid, label, deadline) };
+  });
   const id = sessionId(q, args.salt || '');
   writeFileSync(sessionPath(id), '', 'utf8');
   ledgerAppend(id, { event: 'start', schema_version: '1', session_id: id, question: q, type, frames });
@@ -298,10 +334,10 @@ function toolStart(args) {
     research_type: type,
     frames,
     instructions:
-      `이 ${frames.length}개 프레임을 각각 조사한다. 프레임마다 본 출처를 **버린 것까지 전부** ` +
-      `searchflow_submit 으로 제출한다(grade = 그 URL 이 주장에 대해 무엇인가 · status = 그걸로 무엇을 했나). ` +
-      `제출이 끝나면 searchflow_gate 를 호출한다 — 충분한지는 서버가 판정한다. ` +
-      `깊이를 스스로 정하지 말 것.`,
+      `프레임 ${frames.length}개를 병렬로 조사한다. **각 프레임의 worker_brief 를 그 워커에게 그대로 전달한다** — ` +
+      `문장을 늘리거나 요약하지 말 것(늘어난 문장이 채점 기준을 실어 나른다). ` +
+      `워커 산출이 오면 프레임마다 searchflow_submit 으로 제출하고, 다 냈으면 searchflow_gate 를 호출한다. ` +
+      `충분한지는 서버가 판정한다 — 깊이를 스스로 정하지 말 것.`,
   });
 }
 
