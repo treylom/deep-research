@@ -67,7 +67,22 @@ command = "node"
 args = ["/절대/경로/skills/searchflow/scripts/mcp-server.mjs"]
 ```
 
-> ⚠️ Codex 쪽 등록은 **아직 실기동 확인 전**입니다(설계 문서 P1 잔여). 위 형태는 같은 파일에 이미 등록된 다른 서버들의 실제 표기를 따른 것이고, 왕복 확인은 P3 에서 합니다.
+이 표기는 `codex mcp add` 가 실제로 만들어내는 것과 같습니다(실측 확인).
+
+**대화형(TUI)** 은 첫 호출에서 승인 창이 뜹니다 — `Allow` 를 한 번 누르면 왕복합니다.
+
+**비대화형(`codex exec`)** 은 승인 창을 띄울 자리가 없어 호출이 그대로 취소됩니다. 전역 승인 정책(`-a never`)만으로는 **안 풀립니다** — 그 설정은 MCP 도구 승인까지 덮지 않습니다. 도구별 승인 키를 같이 주세요:
+
+```bash
+codex -a never exec --json \
+  -c 'mcp_servers.searchflow.tools.searchflow_start.approval_mode="approve"' \
+  "<프롬프트>"
+```
+
+- `-a never` 는 **서브커맨드 앞**입니다 (`codex exec -a never` ❌).
+- 키 이름에 도구 이름이 들어갑니다 — 쓰는 도구마다 한 줄씩 필요합니다. **실제로 돌려본 것은 `searchflow_start` 하나**이고, 나머지 둘은 같은 형태일 것이라는 추정입니다.
+- 서버 단위로 한 번에 거는 `mcp_servers.searchflow.default_tools_approval_mode` 도 공식 문서에 있습니다. 다만 **우리가 실호출로 확인한 것은 도구별 키 쪽뿐**입니다.
+- 이 키가 끄는 것은 "이 도구를 호출해도 됩니까"라는 물음입니다. 무인 실행 환경에서만, 무엇을 끄는지 알고 쓰세요.
 
 **동작 확인** — 서버는 줄 단위 JSON-RPC 를 씁니다:
 
