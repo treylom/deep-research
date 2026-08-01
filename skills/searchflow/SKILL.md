@@ -18,6 +18,21 @@ description: Use when a research question needs sourced, cross-checked findings 
 
 > ⚠️ `multi_agent_api` 값은 참고다. **multi-agent 경로의 최종 판정은 리드가 자기 tool 목록을 보고 한다** — shell 스크립트가 모델의 tool 노출을 대신 판정하면 틀린다.
 
+### 0-1. 공정 소유권 — 스킬이 쥐나, 서버가 쥐나
+
+위 두 층과 **직교하는 축**이다(core/enhanced = 어떤 도구를 얹나 · 아래 = 누가 공정을 강제하나).
+
+| 모드 | 조건 | 채점 기준이 사는 곳 | 판정 |
+|---|---|---|---|
+| **skill-owned (기본)** | `searchflow_*` 도구가 tool surface 에 **없다** | `references/scoring.md` — 리드가 읽고 리드가 채점 | 리드 |
+| **server-owned** | `searchflow_start`·`searchflow_submit`·`searchflow_gate` 가 tool surface 에 **있다** | MCP 서버 내부(파일로 존재하지 않음) | 서버 |
+
+- **판정 주체 = 리드가 자기 tool 목록을 보고 한다.** 위 `multi_agent_api` 주의와 같은 이유로 shell 이 대신 판정하지 않는다. 서버가 안 떠 있으면 도구가 애초에 안 보이므로 **탐지 실패 = skill-owned 로 fail-open**(에러 ❌).
+- server-owned 면 리드는 **`scoring.md` 를 열지 않는다.** 프레임·브리핑·판정을 전부 서버에서 받고, 서버가 준 `worker_brief` 를 **그대로** 워커에게 넘긴다(문장을 늘리지 않는다 — §P2.5 와 같은 이유).
+- 어느 쪽이든 **보고서에 모드를 적는다**: `process_owner: skill | server`. 조용한 전환 금지 — 같은 질의가 다른 깊이로 끝났을 때 원인이 모드였는지 알 수 있어야 한다.
+
+> ⚠️ 이 표는 **2026-08-02 신설**이다. 그전까지 서버는 존재했지만 스킬이 그 존재를 몰랐다 — 즉 「2모드」가 설계 문서에만 있고 실행 경로엔 없었다. 두 모드를 비교하려면 먼저 모드가 있어야 한다.
+
 ## 1. 공정 (P0 → P4)
 
 ```
