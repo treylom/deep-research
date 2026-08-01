@@ -57,6 +57,22 @@ function loadCriteria() {
 }
 
 const CRITERIA = loadCriteria();
+
+/**
+ * 리터럴 층의 **건전성 전제**: 통과선이 소수일 것.
+ *
+ * 정수 통과선은 한국어 **세는 표현**으로 쓰면 리터럴 검사를 그냥 지나간다 — 실측:
+ *   통과선 2 · 문안 `근거 2건 이상`·`자료 2개`·`출처 2곳`·`최대 2회` → 전부 미검출.
+ * 수량사 제외 규칙(거짓 RED 방지)과 세는 값(정수)이 **같은 어휘를 두고 정면으로 겹치기** 때문이고,
+ * 규칙을 조여 풀면 `3종` 거짓 RED 가 돌아온다. 어휘 층에서 닫히는 문제가 아니다.
+ *
+ * 그래서 막지 않고 **degraded 로 선언**한다 — 조용히 약해지는 것만 막는다(stdout 오염 ❌, stderr 만).
+ */
+if (Number.isInteger(CRITERIA.threshold)) {
+  process.stderr.write(
+    `[searchflow-mcp] ⚠️ 통과선이 정수(${CRITERIA.threshold}) — 리터럴 누출 검사가 약해진 상태로 돕니다.\n` +
+    '  한국어 세는 표현("근거 2건 이상")으로 적힌 통과선은 검출되지 않습니다. 기준 스왑은 소수 값을 쓰십시오.\n');
+}
 const WEIGHTS = CRITERIA.weights;
 const THRESHOLD = CRITERIA.threshold;
 const MIN_SOURCES = CRITERIA.min_sources;
@@ -585,10 +601,19 @@ function selfTest() {
   process.stdout.write(`\n${results.length - failed}/${results.length} PASS\n`);
   process.stdout.write('참고: 실제 하네스 등록·왕복(2모드 e2e)은 이 --test 에 없다 — P3 소관.\n');
   // 알려진 한계는 통과 화면에도 띄운다 — 주석에만 두면 "18/18" 만 읽고 닫힌 줄 안다.
+  // 알려진 한계는 통과 화면에 **실측과 함께** 띄운다. 목록만 적으면 다음 사람이 다시 잰다.
+  const gap = ['근거 2건 이상 필요', '자료 2개 이상', '출처 2곳 이상', '최대 2회까지']
+    .map((t) => `${t} → ${JSON.stringify(numericTokens(t))}`);
   process.stdout.write(
-    `알려진 한계: 통과선 리터럴 검사의 한글 수량사 목록은 **열린 집합**이다(현재 ${KO_COUNTER.source.split('|').length}종).\n` +
-    '  미등재 수량사 + 같은 값의 정수 통과선 = 거짓 RED (예: 통과선 3 · 문안 "3켤레"). 검출 쪽이라 안전한 방향이고,\n' +
-    '  목록에 조사·서술어를 넣으면 거짓 GREEN 이 되므로 넣지 말 것. 값 공간 쪽 이중 방어 = 기준 스왑 값을 소수로.\n');
+    '알려진 한계 (리터럴 누출 검사):\n' +
+    `  1. 한글 수량사 목록은 **열린 집합**이다(현재 ${KO_COUNTER.source.split('|').length}종). 미등재 수량사 + 같은 값의 정수\n` +
+    '     통과선 = 거짓 RED("3켤레"). 검출 쪽이라 안전한 방향. 목록에 조사·서술어를 넣으면 거짓 GREEN 이 되므로 넣지 말 것.\n' +
+    '  2. 🔴 **건전성 전제 = 통과선이 소수일 것.** 정수 통과선은 한국어 세는 표현으로 우회된다:\n' +
+    gap.map((g) => `       ${g}`).join('\n') + '\n' +
+    '     수량사 제외(거짓 RED 방지)와 세는 값이 같은 어휘를 두고 겹쳐서 생기는 것이라 어휘 층에서 안 닫힌다.\n' +
+    '     ⇒ 기준 스왑 값은 소수로. 그리고 **세는 기준(min_sources·max_rounds)은 이 층에 넣지 말 것** —\n' +
+    '        넣는 순간 수량사 제외가 그 검출을 통째로 무력화한다. 그 축은 키 이름 검사 + 의미 층 소관.\n' +
+    '  3. 띄어쓰기가 판정을 바꾼다: `출처 3 곳` 검출 / `출처 3곳` 미검출. 문안을 고치면 검출 여부도 바뀐다.\n');
   return failed === 0 ? 0 : 1;
 }
 
