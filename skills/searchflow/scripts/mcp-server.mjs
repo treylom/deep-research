@@ -241,7 +241,9 @@ const TOOLS = [
       properties: {
         question: { type: 'string', description: 'The question to research or claim to verify' },
         salt: { type: 'string', description: 'Optional disambiguator when starting two sessions on the same question' },
-        deadline: { type: 'string', description: 'Wall-clock cutoff to hand each worker, e.g. "20 minutes from now". Workers return partial results at the cutoff.' },
+        // ⚠️ 예시에 숫자를 쓰지 않는다 — 워커가 보는 표면의 숫자는 전부 심판이 붙잡을 앵커가 된다.
+        //    첫 판에 "20 minutes from now" 를 넣었다가 말뭉치 수 토큰에 20 이 새로 생겼다(위반은 아니나 불필요).
+        deadline: { type: 'string', description: 'Wall-clock cutoff to hand each worker, as a plain phrase. Workers return partial results at the cutoff.' },
       },
       required: ['question'],
     },
