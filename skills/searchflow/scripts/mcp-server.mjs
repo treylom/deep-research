@@ -74,8 +74,10 @@ const LEAK_KEYS = new Set([
 function stateDir() {
   const env = process.env.SEARCHFLOW_STATE_DIR;
   const base = env ? resolve(env) : join(homedir(), '.searchflow');
-  try { mkdirSync(join(base, 'sessions'), { recursive: true }); return join(base, 'sessions'); }
-  catch { const t = join(tmpdir(), 'searchflow-sessions'); mkdirSync(t, { recursive: true }); return t; }
+  // mode 0o700 — 원장에는 어떤 출처를 어떻게 판정했는지가 남는다. 같은 기계의 다른 프로세스가
+  // 읽을 수 있으면 "안 보낸다"만 지킨 반쪽 격리다(코난 ③).
+  try { mkdirSync(join(base, 'sessions'), { recursive: true, mode: 0o700 }); return join(base, 'sessions'); }
+  catch { const t = join(tmpdir(), 'searchflow-sessions'); mkdirSync(t, { recursive: true, mode: 0o700 }); return t; }
 }
 
 const sessionPath = (id) => join(stateDir(), `${id}.jsonl`);
@@ -83,6 +85,21 @@ const sessionPath = (id) => join(stateDir(), `${id}.jsonl`);
 /** 매 도구 호출을 append — "검증했다"가 주장이 아니라 원장이 되게. */
 function ledgerAppend(id, event) {
   appendFileSync(sessionPath(id), JSON.stringify(event) + '\n', 'utf8');
+}
+
+/**
+ * ① 워커가 실제로 받은 것을 **verbatim** 으로 남긴다(요약 ❌).
+ * 은닉을 나중에 검증하려면 "서버가 뭘 보냈다고 주장하는가"가 아니라
+ * "실제로 나간 바이트가 무엇인가"가 있어야 한다. 요약해 두면 그 시점에 측정이 죽는다.
+ */
+function recordOutbound(id, tool, payload) {
+  ledgerAppend(id, {
+    event: 'outbound',
+    tool,
+    verbatim: JSON.stringify(payload),   // 문자열 그대로 — 재파싱 없이 원문 대조 가능
+    bytes: Buffer.byteLength(JSON.stringify(payload), 'utf8'),
+  });
+  return payload;
 }
 
 function ledgerRead(id) {
@@ -208,7 +225,7 @@ function toolStart(args) {
   const id = sessionId(q, args.salt || '');
   writeFileSync(sessionPath(id), '', 'utf8');
   ledgerAppend(id, { event: 'start', schema_version: '1', session_id: id, question: q, type, frames });
-  return {
+  return recordOutbound(id, 'searchflow_start', {
     session_id: id,
     research_type: type,
     frames,
@@ -217,7 +234,7 @@ function toolStart(args) {
       `searchflow_submit 으로 제출한다(grade = 그 URL 이 주장에 대해 무엇인가 · status = 그걸로 무엇을 했나). ` +
       `제출이 끝나면 searchflow_gate 를 호출한다 — 충분한지는 서버가 판정한다. ` +
       `깊이를 스스로 정하지 말 것.`,
-  };
+  });
 }
 
 function toolSubmit(args) {
@@ -236,8 +253,14 @@ function toolSubmit(args) {
     if (s.status === 'discarded' && !s.discard_reason)
       throw new Error('status=discarded 면 discard_reason 필수');
   }
-  ledgerAppend(session_id, { event: 'submit', frame_id, sources });
-  return { accepted: sources.length, frame_id, next: '남은 프레임을 제출하거나, 다 냈으면 searchflow_gate 를 호출한다.' };
+  // 둘 다 남긴다: `sources` = 게이트가 읽는 구조 · `sources_verbatim` = 감사용 원문(①).
+  // verbatim 만 남기면 소비자가 깨지고, 구조만 남기면 "실제로 뭐가 왔나"를 나중에 못 잰다.
+  ledgerAppend(session_id, {
+    event: 'submit', frame_id, sources,
+    sources_verbatim: JSON.stringify(sources),
+    inbound_bytes: Buffer.byteLength(JSON.stringify(sources), 'utf8'),
+  });
+  return recordOutbound(session_id, 'searchflow_submit', { accepted: sources.length, frame_id, next: '남은 프레임을 제출하거나, 다 냈으면 searchflow_gate 를 호출한다.' });
 }
 
 function toolGate(args) {
@@ -259,7 +282,7 @@ function toolGate(args) {
     const out = { decision: 'incomplete', awaiting_frames: missing,
       guidance: '아직 제출되지 않은 프레임이 있다. 먼저 제출한다.' };
     ledgerAppend(session_id, { event: 'gate', decision: out.decision, awaiting: missing });
-    return assertNoLeak(out);
+    return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
   }
 
   // 판정은 서버 안에서. 밖으로는 결론만.
@@ -271,7 +294,7 @@ function toolGate(args) {
     const out = { decision: 'done',
       guidance: '근거가 충분하다. searchflow_report 로 보고서를 구성한다(P2 제공 예정 — 현재는 원장을 근거로 직접 작성).' };
     ledgerAppend(session_id, { event: 'gate', decision: 'done', rounds: rounds + 1 });
-    return assertNoLeak(out);
+    return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
   }
 
   if (rounds + 1 >= MAX_ROUNDS) {
@@ -279,7 +302,7 @@ function toolGate(args) {
       weak_frames: weak.map((w) => w.fid),
       guidance: '재조사 상한에 도달했다. 부족한 프레임을 보고서에 **한계로 명시**하고 마무리한다 — 조용히 넘기지 말 것.' };
     ledgerAppend(session_id, { event: 'gate', decision: out.decision, rounds: rounds + 1, weak: out.weak_frames });
-    return assertNoLeak(out);
+    return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
   }
 
   const target = weak[0];
@@ -289,7 +312,7 @@ function toolGate(args) {
   const out = { decision: 'reinvestigate', frame_id: target.fid, guidance: reason,
     note: '가장 약한 프레임 하나만 다시 본다. 나머지는 그대로 둔다.' };
   ledgerAppend(session_id, { event: 'gate', decision: 'reinvestigate', frame_id: target.fid, rounds: rounds + 1 });
-  return assertNoLeak(out);
+  return recordOutbound(session_id, 'searchflow_gate', assertNoLeak(out));
 }
 
 const DISPATCH = { searchflow_start: toolStart, searchflow_submit: toolSubmit, searchflow_gate: toolGate };
@@ -457,6 +480,66 @@ if (process.argv.includes('--test')) {
 }
 if (process.argv.includes('--tools')) {
   process.stdout.write(JSON.stringify({ tools: TOOLS.map((t) => t.name) }) + '\n');
+  process.exit(0);
+}
+
+/**
+ * ②③ 공개 표면 감사 — 검증자가 서버 **밖에서** 은닉을 재기 위한 입구.
+ *   ② tools/list 스키마 스냅샷: 서버가 안 보내도 **하네스가 컨텍스트에 싣는** 표면이다.
+ *      도구 설명·스키마는 워커가 항상 본다 — 여기에 기준이 새면 서버 은닉은 무의미하다.
+ *   ③ 원장·기준의 경로와 권한: 격리는 "안 보낸다" + "못 읽는다" 두 개다.
+ *      경로를 안 적어두면 나중에 "워커가 원장을 읽을 수 있었나"를 되물을 수 없다.
+ */
+if (process.argv.includes('--audit')) {
+  const dir = stateDir();
+  let mode = null, ownerOnly = null;
+  try {
+    const { statSync } = await import('node:fs');
+    mode = (statSync(dir).mode & 0o777).toString(8);
+    ownerOnly = !(statSync(dir).mode & 0o077);
+  } catch { /* 못 읽으면 null — 모른다를 0 으로 적지 않는다 */ }
+
+  // 워커가 볼 수 있는 정적 문자열 전부(도구 스키마 + 지시문 상수)
+  const workerVisible = JSON.stringify(TOOLS) +
+    Object.values(TYPES).flat().join(' ');
+
+  // 두 부류를 갈라 센다 — 섞으면 정상 노출이 위반을 가려서 이 검사기가 무시당한다.
+  //   어휘: 워커가 등급을 *붙이려면* 알아야 한다(노출 정상). 값: 새면 워커가 맞춰 쓴다(위반).
+  const vocabulary = [...Object.keys(DEFAULT_CRITERIA.weights)]
+    .filter((t) => workerVisible.includes(t));
+  const valueLeaks = [
+    String(DEFAULT_CRITERIA.threshold),
+    ...Object.values(DEFAULT_CRITERIA.weights).map(String).filter((v) => v !== '0' && v !== '1'),
+  ].filter((v) => workerVisible.includes(v));
+  // 「기준이 존재한다」는 언급(부정문 포함)은 값이 아니다 — 따로 센다.
+  const mentions = ['threshold', 'weight', 'score', 'cutoff', '통과선', '가중치', '점수']
+    .filter((t) => workerVisible.toLowerCase().includes(t.toLowerCase()));
+
+  process.stdout.write(JSON.stringify({
+    schema_version: '1',
+    proof_class: 'deterministic',
+    server: SERVER_INFO,
+    protocol_version: PROTOCOL_VERSION,
+    tools_schema: TOOLS,                       // ② 스냅샷 (해시 아닌 전문 — 나중에 diff 가능)
+    tools_schema_bytes: Buffer.byteLength(JSON.stringify(TOOLS), 'utf8'),
+    state: {                                   // ③ 경로·권한
+      ledger_dir: dir,
+      ledger_dir_mode: mode,
+      ledger_owner_only: ownerOnly,
+      criteria_source: process.env.SEARCHFLOW_CRITERIA ? 'env:SEARCHFLOW_CRITERIA' : 'built-in default',
+      criteria_in_repo_file: false,            // 기준은 파일이 아니라 서버 상수 — 워커 경로에 없음
+    },
+    disclosure: {
+      // ⚠️ 이 값이 0 이 아니면 스키마 표면으로 기준이 새는 것이다(서버 은닉과 별개 층).
+      grade_vocabulary_exposed: vocabulary,
+      criteria_values_leaked: valueLeaks,
+      criteria_mentioned_without_value: mentions,
+      verdict: valueLeaks.length === 0 ? 'PASS — 값 유출 0' : 'FAIL — 기준 값이 스키마 표면에 있다',
+      note: 'grade_vocabulary_exposed 는 정상이다(워커가 등급을 붙이려면 알아야 한다). ' +
+            'criteria_mentioned_without_value 도 대개 정상 — 도구 설명이 "점수는 안 준다"고 *부정*하는 문장이라 ' +
+            '기준의 존재는 알리되 값은 안 준다. 판정 대상은 criteria_values_leaked 하나다.',
+    },
+  }, null, 2) + '\n');
   process.exit(0);
 }
 serve();
