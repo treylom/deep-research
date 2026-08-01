@@ -20,7 +20,7 @@ argument-hint: <조사할 질문 또는 검증할 주장>
 ## 시작 시 1회
 
 ```bash
-node skills/searchflow/scripts/env-detect.mjs        # exit 항상 0, stdout 1줄 JSON
+node skills/searchflow/scripts/env-detect.mjs        # 인자 없이 호출 = exit 0 고정, stdout 1줄 JSON
 ```
 
 결과는 **리드만 소비한다.** enhanced 부재 = 에러가 아니라 core 강등 + 보고서 격하 라벨.

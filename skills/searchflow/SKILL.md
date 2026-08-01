@@ -14,7 +14,7 @@ description: Use when a research question needs sourced, cross-checked findings 
 - **core (기본)**: 순정 Claude Code 또는 순정 Codex CLI + 이 스킬 번들만으로 완주한다. 외부 패키지 · 내부 MCP · 특정 플러그인 requirement **0**.
 - **enhanced (선택)**: 환경에 있으면 얹는다. 없으면 **에러 없이 core 로 강등하고 격하 라벨을 보고서에 남긴다** — 조용한 skip 금지.
 
-`scripts/env-detect.mjs` 를 시작 시 1회 실행해 참고값을 얻는다(exit 항상 0, stdout 1줄 JSON). **탐지 결과는 리드만 소비한다.**
+`scripts/env-detect.mjs` 를 시작 시 1회 실행해 참고값을 얻는다(인자 없이 호출 = exit 0 고정, stdout 1줄 JSON). **탐지 결과는 리드만 소비한다.**
 
 > ⚠️ `multi_agent_api` 값은 참고다. **multi-agent 경로의 최종 판정은 리드가 자기 tool 목록을 보고 한다** — shell 스크립트가 모델의 tool 노출을 대신 판정하면 틀린다.
 

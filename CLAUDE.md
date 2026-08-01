@@ -43,7 +43,9 @@ node ~/.claude/skills/searchflow/scripts/env-detect.mjs
 {"cross_engine":false,"knowledge_hook":false,"ooo":false,"multi_agent_api":"none"}
 ```
 
-앞의 셋은 참/거짓이고 **`multi_agent_api` 만 문자열**(`public`·`collab_v2`·`none`)입니다 — 없을 때 값이 `false` 가 아니라 `"none"` 입니다. 이 스크립트는 **항상 종료 코드 0** 을 냅니다(없음을 오류가 아니라 값으로 표현합니다).
+앞의 셋은 참/거짓이고 **`multi_agent_api` 만 문자열**(`public`·`collab_v2`·`none`)입니다 — 없을 때 값이 `false` 가 아니라 `"none"` 입니다.
+
+**종료 코드**: 위처럼 **인자 없이 실행하는 설치 확인은 항상 0** 입니다(없음을 오류가 아니라 값으로 표현합니다). 다만 **`--test`(자체 테스트)만은 실패 시 1** 을 냅니다 — 이쪽은 "부재"가 아니라 "검사기가 깨졌다"는 뜻이라 0으로 덮으면 안 됩니다.
 
 ## 사용법
 

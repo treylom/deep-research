@@ -4,7 +4,8 @@
 // 계약 (21-implementation-spec §2-6 ABI):
 //   argv   : (없음)  |  --test
 //   stdout : JSON 1줄 {"cross_engine":bool,"knowledge_hook":bool,"ooo":bool,"multi_agent_api":"public|collab_v2|none"}
-//   exit   : 항상 0 (fail-open — 부재는 exit 코드가 아니라 값으로 표현한다)
+//   exit   : 본 경로(인자 없음) = 항상 0 (fail-open — 부재는 exit 코드가 아니라 값으로 표현한다)
+//            `--test` 만 예외: 자체 테스트 실패 시 1 (검사기가 깨진 것은 "부재" 가 아니다)
 //   자체 timeout : 5s (탐지가 리서치를 붙잡지 않는다)
 //
 // 진단 메시지는 stderr 로만 — stdout 은 파싱 가능한 1줄을 유지한다.
