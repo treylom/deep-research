@@ -6,7 +6,7 @@ description: "[DEPRECATED — do not use; grading canon is `skills/searchflow/re
 # Deep Research Source Quality
 
 > ⚠️ **DEPRECATED — 구 공정 문서.** 현행은 **`/searchflow`** 입니다(등급 정본 = `skills/searchflow/references/scoring.md`).
-> 등급을 정하는 기준 자체가 다릅니다 — 구 A–E 는 **매체가 어디인가**(도메인 목록)로 정했고, 현행 5등급 **원Source · A급 · B급 · C급 · 사용불가** 는 **"이 URL 이 그 주장에 대해 무엇인가"** 로 정합니다. 같은 신문이라도 원문을 그대로 실으면 원Source, 해설이면 C 입니다.
+> 등급을 정하는 기준 자체가 다릅니다 — 구 A–E 는 **매체가 어디인가**(도메인 목록)로 정했고, 현행 등급 4단 **원Source · A급 · B급 · C급** 은 **"이 URL 이 그 주장에 대해 무엇인가"** 로 정합니다. 같은 신문이라도 원문을 그대로 실으면 원Source, 해설이면 C 입니다. (`사용불가` 는 등급이 아니라 **처분**, `UNREACHABLE` 은 **못 읽었다**는 별개 축입니다)
 > 두 체계를 섞어 쓰지 마세요. 사람이 읽는 이름과 원장에 적히는 값의 대응은 `scoring.md` **§1-1 매핑 정본**에 있습니다.
 
 > 소스 품질 등급 시스템 — IFCN(International Fact-Checking Network) 원칙 통합.

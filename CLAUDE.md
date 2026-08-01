@@ -11,7 +11,10 @@
 
 ```bash
 # 저장소 안에서 실행합니다.
-# 끝의 /* 가 중요합니다 — 슬래시로 끝내면 대상 폴더 안에 한 겹 더 들어갑니다.
+# ⚠️ 폴더 이름을 그대로 주지 마세요 — `cp -r skills ~/.claude/skills/` 처럼 쓰면
+#    대상 안에 `skills/skills/` 로 한 겹 더 들어갑니다. 끝에 `/*` 를 붙이면 안전합니다.
+#    (macOS `/bin/cp` 실측: `skills/*`·`skills/` 는 안 들어가고, `skills` 만 들어갑니다.
+#     GNU cp 는 미확인 — 확실한 `/*` 형태를 씁니다.)
 mkdir -p ~/.claude/skills ~/.claude/commands ~/.claude/agents
 cp -r skills/*   ~/.claude/skills/
 cp -r commands/* ~/.claude/commands/
@@ -32,7 +35,15 @@ node ~/.claude/skills/searchflow/scripts/env-detect.mjs
 {"cross_engine":true,"knowledge_hook":false,"ooo":true,"multi_agent_api":"collab_v2"}
 ```
 
-파일을 못 찾는다는 오류가 나면 `scripts/` 가 같이 복사되지 않은 것입니다. 값이 전부 `false` 로 나오는 것은 **정상**입니다 — 이 저장소 밖의 선택 도구가 없다는 뜻일 뿐, 공정은 그대로 돕니다.
+파일을 못 찾는다는 오류가 나면 `scripts/` 가 같이 복사되지 않은 것입니다.
+
+**아무것도 없는 환경이면 이렇게 나오고, 그것도 정상입니다** — 저장소 밖 선택 도구가 없다는 뜻일 뿐 공정은 그대로 돕니다:
+
+```json
+{"cross_engine":false,"knowledge_hook":false,"ooo":false,"multi_agent_api":"none"}
+```
+
+앞의 셋은 참/거짓이고 **`multi_agent_api` 만 문자열**(`public`·`collab_v2`·`none`)입니다 — 없을 때 값이 `false` 가 아니라 `"none"` 입니다. 이 스크립트는 **항상 종료 코드 0** 을 냅니다(없음을 오류가 아니라 값으로 표현합니다).
 
 ## 사용법
 
@@ -55,7 +66,9 @@ node ~/.claude/skills/searchflow/scripts/env-detect.mjs
 | **커맨드**(`commands/*.md`)의 `description` | 한국어 | 슬래시 메뉴에서 **사용자에게 그대로 보이는** 자리입니다 |
 | `name` · `argument-hint` | 기존 표기 유지 | 바꾸면 호출 이름이 깨집니다 |
 
-**폐기된 스킬의 `description` 은 반드시 `[DEPRECATED …]` 로 시작합니다.** 본문에 아무리 큰 경고를 붙여도 스킬 선택은 `description` 만 보고 일어나므로, 본문 배너만으로는 폐기된 공정이 다시 뽑히는 것을 막지 못합니다.
+**폐기된 것의 `description` 은 반드시 `[DEPRECATED …]` 로 시작합니다 — 스킬만이 아니라 에이전트·커맨드까지 전부.** 본문에 아무리 큰 경고를 붙여도 무엇을 부를지 고르는 층은 `description` 만 보므로, 본문 배너로는 폐기된 공정이 다시 뽑히는 것을 막지 못합니다. 같은 이유가 에이전트(스폰 대상 선택)와 커맨드(호출 목록)에도 그대로 적용됩니다.
+
+현재 적용 대상 4종: `skills/deep-research-pipeline.md` · `skills/deep-research-source-quality.md` · `agents/deep-researcher.md` · `commands/deep-research.md`.
 
 ## 선택 의존성
 
