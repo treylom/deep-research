@@ -2,7 +2,9 @@
 // publish-scan.mjs — 공개 안전 스캔 (배포 전 게이트)
 //
 // 계약:
-//   argv   : [<대상>] [--patterns <file.json>] [--json] [--allow-missing-patterns]  |  --test
+//   argv   : [<대상>] [--patterns <file.json>] [--json] [--allow-missing-patterns]
+//            [--git-log [<범위>]]   커밋 메시지도 같은 규칙으로 검사(기본 HEAD) — 아래 사각 참조
+//            |  --test
 //   stdout : 위반 목록(사람용) 또는 JSON 1줄
 //   exit   : 0=위반 0 · 1=위반 있음 · 2=스크립트 오류·근거 부족(통과 취급 ❌)
 //
@@ -103,6 +105,38 @@ export function scan(target = REPO, orgRules = [], allow = []) {
   return { target, files_scanned: files.length, axes: [...new Set(rules.map(r => r.axis))], violations };
 }
 
+/**
+ * 커밋 메시지 축 — 작업 트리만 보는 검사기의 사각.
+ *
+ * 파일은 고치면 되지만 **커밋 메시지는 push 되면 사실상 되돌릴 수 없다**(히스토리 재작성 = 별개 결정).
+ * 그래서 이 축은 "고쳐라"가 아니라 **"내보내기 전에 알아라"** 로 존재한다.
+ * allow 목록은 경로 기준이라 여기서는 대개 안 걸린다 — 파일에 준 예외가 메시지 예외로 번지지 않게
+ * 의도한 것이다(LICENSE 에 준 허용이 커밋 제목을 통과시키면 안 된다).
+ */
+export function scanGitLog(range, orgRules = [], allow = [], cwd = REPO) {
+  const g = spawnSync('git', ['log', '--format=%H%x00%B%x1e', range], { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (g.status !== 0) die(2, `git log 실패(${range}) — 범위를 못 읽으면 "깨끗하다"고 말할 수 없다: ${(g.stderr || '').trim()}`);
+  const recs = g.stdout.split('\x1e').map(s => s.trim()).filter(Boolean);
+  if (!recs.length) die(2, `커밋 0건: ${range} (빈 범위를 통과로 세지 않는다)`);
+
+  const rules = [...GENERIC_RULES, ...orgRules];
+  const violations = [];
+  for (const rec of recs) {
+    const [sha, body = ''] = rec.split('\x00');
+    const label = `commit ${sha.slice(0, 7)}`;
+    const lines = body.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      for (const r of rules) {
+        const m = lines[i].match(r.re);
+        if (!m) continue;
+        if (allow.some(a => a.file.test(label) && a.re.test(m[0]))) continue;
+        violations.push({ file: label, line: i + 1, axis: r.axis, why: r.why, hit: m[0].slice(0, 60) });
+      }
+    }
+  }
+  return { range, commits_scanned: recs.length, violations };
+}
+
 /** 양성 대조 — 씨앗을 심은 임시 트리에서 각 축이 실제로 잡히는지 잰다. */
 export function positiveControl(orgRules = []) {
   const dir = mkdtempSync(join(tmpdir(), 'pubscan-'));
@@ -185,7 +219,10 @@ else {
   const asJson = argv.includes('--json');
   const allowMissing = argv.includes('--allow-missing-patterns');
   const patPath = flagVal('--patterns') || process.env.PUBLISH_SCAN_PATTERNS || null;
-  const positional = argv.filter((a, i) => !a.startsWith('--') && argv[i - 1] !== '--patterns');
+  // ⚠️ 값을 받는 플래그를 한 곳에 모은다 — 신규 플래그를 여기 안 넣으면 그 **값이 스캔 대상으로**
+  //    둔갑한다(실측으로 걸렸다: `--git-log origin/main` → 대상 `<repo>/origin/main` → exit 2).
+  const VALUE_FLAGS = new Set(['--patterns', '--git-log']);
+  const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUE_FLAGS.has(argv[i - 1]));
   const target = positional[0] ? resolve(positional[0]) : REPO;
 
   let org = { rules: [], allow: [] };
@@ -197,14 +234,25 @@ else {
   if (pc.missed.length) die(2, `양성 대조 실패 — 축 ${pc.missed.join(',')} 를 못 잡는다. 이 스캔 결과는 신뢰할 수 없다.`);
 
   const out = scan(target, org.rules, org.allow);
+
+  // 커밋 메시지 축 — 명시 요청 시에만(범위를 사람이 정한다). 기본 동작 불변.
+  const wantLog = argv.includes('--git-log');
+  const logOut = wantLog ? scanGitLog(flagVal('--git-log') || 'HEAD', org.rules, org.allow) : null;
+
   const meta = { ...out, positive_control: pc.caught, org_axis: patPath ? 'loaded' : 'not-loaded',
-                 org_axes_without_probe: pc.org_axes_without_probe };
+                 org_axes_without_probe: pc.org_axes_without_probe, git_log: logOut };
   if (asJson) process.stdout.write(JSON.stringify(meta) + '\n');
   else {
     process.stdout.write(`[publish-scan] 양성 대조 OK(${pc.caught.join(',')}) · 조직 축=${meta.org_axis} · 파일 ${out.files_scanned}개 · 위반 ${out.violations.length}건\n`);
     if (pc.org_axes_without_probe.length)
       process.stdout.write(`  ⚠️ 대조 미검증 조직 축(씨앗 probe 없음): ${pc.org_axes_without_probe.join(',')} — 이 축의 0 은 미측정과 구분되지 않는다\n`);
     for (const v of out.violations) process.stdout.write(`  ${v.file}:${v.line} [${v.axis}] ${v.why} — "${v.hit}"\n`);
+    if (logOut) {
+      process.stdout.write(`[publish-scan] 커밋 메시지 축 · 범위 ${logOut.range} · 커밋 ${logOut.commits_scanned}개 · 위반 ${logOut.violations.length}건\n`);
+      for (const v of logOut.violations) process.stdout.write(`  ${v.file}:${v.line} [${v.axis}] ${v.why} — "${v.hit}"\n`);
+      if (logOut.violations.length)
+        process.stdout.write('  ⚠️ 커밋 메시지는 push 된 뒤 파일처럼 고칠 수 없다 — 히스토리 재작성은 별개 결정이다. 이 축은 "내보내기 전에 알아라" 용도다.\n');
+    }
   }
-  process.exit(out.violations.length ? 1 : 0);
+  process.exit((out.violations.length + (logOut?.violations.length || 0)) ? 1 : 0);
 }
