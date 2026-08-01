@@ -142,8 +142,13 @@ function sessionId(question, salt) {
   for (const ch of `${question}::${salt}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
   const base = 'sf-' + (h >>> 0).toString(36);
   if (!existsSync(sessionPath(base))) return base;
-  for (let n = 2; n <= 10000; n += 1) {
-    const cand = `${base}-${n}`;
+  // 접미사는 **글자만** 쓴다(`-a`, `-b`, … `-aa`). 숫자를 쓰면 session_id 가 outbound 에 실려
+  // 워커·심판이 보는 말뭉치에 **기준값과 구별 안 되는 수 토큰**을 하나 새로 넣는다 —
+  // 이 서버의 목적이 수치를 안 흘리는 것인데 충돌 처리가 수치를 만들면 앞뒤가 안 맞는다.
+  for (let n = 1; n <= 10000; n += 1) {
+    let k = n, sfx = '';
+    while (k > 0) { k -= 1; sfx = String.fromCharCode(97 + (k % 26)) + sfx; k = Math.floor(k / 26); }
+    const cand = `${base}-${sfx}`;
     if (!existsSync(sessionPath(cand))) return cand;
   }
   // 여기 오면 같은 질문이 1만 번 쌓인 것 — 조용히 덮어쓰느니 멈춘다.
