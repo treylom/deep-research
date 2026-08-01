@@ -124,11 +124,25 @@ function ledgerRead(id) {
   return readFileSync(p, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 }
 
-// 결정적 세션 id — Date.now()/random 없이(재현 가능). 원장 파일명 충돌만 피하면 된다.
+/**
+ * 세션 id — 해시 기반(Date.now()/random 없이 재현 가능)이되 **이미 쓰인 id 는 재사용하지 않는다**.
+ *
+ * 🔴 구 판본은 base 를 그대로 돌려줬다. 같은 질문으로 다시 시작하면 같은 id 가 나오고,
+ *    start 가 그 경로를 truncate 해서 **앞 세션의 원장이 통째로 사라졌다**(재현: 같은 질문 2회 →
+ *    파일 1개·start 이벤트 1개). 원장이 이 서버의 증거 전부라 조용한 삭제가 가장 나쁜 형태다.
+ *    "재현 가능"은 테스트 편의였고, 그 편의가 지켜야 할 것(증거 보존)을 이겼다.
+ */
 function sessionId(question, salt) {
   let h = 2166136261;
   for (const ch of `${question}::${salt}`) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
-  return 'sf-' + (h >>> 0).toString(36);
+  const base = 'sf-' + (h >>> 0).toString(36);
+  if (!existsSync(sessionPath(base))) return base;
+  for (let n = 2; n <= 10000; n += 1) {
+    const cand = `${base}-${n}`;
+    if (!existsSync(sessionPath(cand))) return cand;
+  }
+  // 여기 오면 같은 질문이 1만 번 쌓인 것 — 조용히 덮어쓰느니 멈춘다.
+  throw new Error(`세션 id 고갈: ${base} 계열이 10000개. 원장 디렉터리를 정리하거나 salt 를 주십시오.`);
 }
 
 // ── 공정 ──────────────────────────────────────────────────────────────────
@@ -329,7 +343,7 @@ function toolStart(args) {
     return { frame_id: fid, focus: label, worker_brief: workerBrief(q, fid, label, deadline) };
   });
   const id = sessionId(q, args.salt || '');
-  writeFileSync(sessionPath(id), '', 'utf8');
+  // truncate 하지 않는다 — id 가 미사용임을 sessionId 가 보장하고, appendFileSync 가 파일을 만든다.
   ledgerAppend(id, { event: 'start', schema_version: '1', session_id: id, question: q, type, frames });
   return recordOutbound(id, 'searchflow_start', {
     session_id: id,
@@ -510,6 +524,14 @@ function selfTest() {
   // 5 start 가 세션·프레임 생성
   const s1 = S('이 주장이 사실인가');
   ok('start = 세션+프레임 생성', s1.session_id?.startsWith('sf-') && s1.frames.length === 3, s1.session_id);
+
+  // 5-b 같은 질문 재시작이 앞 원장을 지우지 않는다 (회귀 — 구 판본은 통째로 덮어썼다)
+  const dupQ = '같은 질문으로 두 번 시작한다';
+  const d1 = S(dupQ), d2 = S(dupQ);
+  const startsIn = (id) => (ledgerRead(id) || []).filter((e) => e.event === 'start').length;
+  ok('같은 질문 재시작 = id 분리·앞 원장 보존',
+     d1.session_id !== d2.session_id && startsIn(d1.session_id) === 1 && startsIn(d2.session_id) === 1,
+     `${d1.session_id} / ${d2.session_id} · start ${startsIn(d1.session_id)},${startsIn(d2.session_id)}`);
 
   // 6 enum 위반은 거부 (음성 대조)
   let rejected = false;
