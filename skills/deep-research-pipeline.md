@@ -5,6 +5,9 @@ description: Use when needing 7-Phase 리서치 엔진 — 서브토픽 분해, 
 
 # Deep Research Pipeline Engine
 
+> ⚠️ **DEPRECATED — 구 공정 문서.** 현행 정본 = `skills/searchflow/SKILL.md` (`/searchflow`).
+> 구 참조를 깨지 않기 위해 존치하며, 신규 작업은 searchflow 공정을 씁니다. 제거 시점 = 마이너 2회 후 별건 판단(`commands/deep-research.md` 와 같은 정책).
+
 > `/deep-research` 커맨드의 핵심 파이프라인 스펙.
 > 서브토픽 분해 → 병렬 수집 → 교차검증 → 합성 → QA → 출력.
 
@@ -400,51 +403,4 @@ subtopics: 5-7
 timeout_minutes: 60
 ralph_loop: enabled (max 3 iterations)
 output: 10+ 페이지 보고서 + 부록
-```
-
----
-
-## 9. /tofu-at 워크플로우 엔진 통합
-
-### 에이전트 유닛 분해
-
-이 파이프라인을 tofu-at-workflow.md 기준으로 분해하면:
-
-```
-| 유닛 | 카테고리 | subagent_type | 모델 | 도구 |
-|------|---------|---------------|------|------|
-| Lead (오케스트레이터) | Foundation | general-purpose | opus | 전체 |
-| web-searcher-1 | Ingest | Explore | sonnet | WebSearch, WebFetch |
-| web-searcher-2 | Ingest | Explore | sonnet | WebSearch, WebFetch |
-| academic-searcher | Ingest | Explore | sonnet | WebSearch, hyperbrowser |
-| cross-reference | Analyze | Explore | sonnet | Read, Grep |
-| synthesizer | Analyze | general-purpose | sonnet | Read, Write |
-| qa-reviewer | QA | Explore | sonnet | WebSearch, Read |
-```
-
-### 카테고리 매핑 (tofu-at-workflow.md 섹션 4 참조)
-
-```
-- Lead: Foundation (오케스트레이션)
-- web-searcher-*: Ingest (crawl, scrape, extract, fetch, web)
-- academic-searcher: Ingest (fetch, extract)
-- cross-reference: Analyze (analyze, classify)
-- synthesizer: Analyze (summarize, tag)
-- qa-reviewer: QA (verify, quality)
-```
-
-### Ralph 루프 적용 기준 (tofu-at-workflow.md 섹션 8 참조)
-
-```
-리서치 워크플로우 → Ralph 권장 (분석/리서치 = 검증 중요)
-
-설정:
-  ralph_loop:
-    enabled: true (standard/deep), false (quick)
-    max_iterations: 1 (standard), 3 (deep)
-    review_criteria:
-      citation_coverage: { weight: 1.5, target: "100%" }
-      source_quality: { weight: 1.0, target: "B+ >= 80%" }
-      cross_verification: { weight: 1.0, target: ">= 70%" }
-      completeness: { weight: 1.0, target: "모든 서브토픽 커버" }
 ```

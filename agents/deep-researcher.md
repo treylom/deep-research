@@ -7,6 +7,9 @@ allowedTools: Read, Write, Glob, Grep, WebSearch, WebFetch, ToolSearch, TaskCrea
 
 # Deep Researcher Agent
 
+> ⚠️ **DEPRECATED — 구 공정 워커.** 현행 정본 = `skills/searchflow/SKILL.md` (`/searchflow`).
+> 구 스폰 경로를 깨지 않기 위해 존치합니다. searchflow core 는 **순정 CLI + 번들만으로 완주**하는 것이 계약이라, 이 에이전트를 전제하지 않습니다.
+
 > /deep-research 커맨드에서 Agent Teams로 스폰되는 워커 에이전트.
 > 역할에 따라 수집, 교차검증, 합성, QA 중 하나를 수행합니다.
 
@@ -199,12 +202,3 @@ allowedTools: Read, Write, Glob, Grep, WebSearch, WebFetch, ToolSearch, TaskCrea
   - 기업 후원 연구 → [sponsored] 표시
 </task>
 ```
-
----
-
-## /tofu-at spawn 호환
-
-이 에이전트는 /tofu-at의 spawn 시스템과 호환됩니다:
-- `tofu-at-spawn-templates.md`의 Worker 프롬프트 래핑 적용
-- `tofu-at-workflow.md`의 DEAD_ENDS 프로토콜 적용
-- Ralph 루프 호환 (REVISE 피드백 수신 시 재작업)

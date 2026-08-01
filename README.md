@@ -53,7 +53,6 @@ CLAUDE.md 참조.
 단독으로 사용할 수 있지만, 다음 플러그인과 함께 쓰면 더 효과적입니다:
 
 - [knowledge-manager](https://github.com/treylom/knowledge-manager): 콘텐츠 추출 + Obsidian 저장
-- [tofu-at](https://github.com/treylom/tofu-at): Agent Teams 병렬 수집
 - [prompt-engineering-skills](https://github.com/treylom/prompt-engineering-skills): 워커 프롬프트 최적화
 
 ## 라이선스

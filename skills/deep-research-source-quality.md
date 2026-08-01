@@ -5,6 +5,9 @@ description: Use when needing a-E 소스 품질 등급 시스템 + IFCN 원칙 �
 
 # Deep Research Source Quality
 
+> ⚠️ **DEPRECATED — 구 공정 문서.** 현행 정본 = `skills/searchflow/references/scoring.md` (`/searchflow`).
+> 등급 축이 다릅니다 — 구 A–E 는 **도메인 화이트리스트** 기반이고, 현행 `ORIGINAL|A|B|C|UNREACHABLE` 은 **"이 URL 이 그 주장에 대해 무엇인가"** 기반입니다. 두 체계를 섞어 쓰지 마세요.
+
 > 소스 품질 등급 시스템 — IFCN(International Fact-Checking Network) 원칙 통합.
 > /deep-research 파이프라인의 P2(수집), P3(교차검증), P5(QA)에서 사용.
 

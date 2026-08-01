@@ -31,5 +31,4 @@ cp -r agents/ ~/.claude/agents/
 
 다음 플러그인이 설치되어 있으면 자동으로 연동됩니다:
 - **knowledge-manager**: 콘텐츠 추출, 이미지 파이프라인 활용
-- **tofu-at**: Agent Teams로 병렬 수집 (표준/딥다이브)
 - **prompt-engineering-skills**: 워커 프롬프트 최적화
