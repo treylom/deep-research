@@ -1,0 +1,60 @@
+#!/bin/sh
+# pre-push — 공개 안전 스캔을 **push 를 막는 위치**에 둔다.
+#
+# 왜 있는가: 스캔은 제 몫을 했는데(exit 1) 그 결과가 화면에만 찍히고 push 를 막는 자리에
+#   없었던 적이 있다. 사람이 결과를 보고 멈추는 것은 재발한다 — 멈춤을 여기로 옮긴다.
+#
+# 설치:  cp tools/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#   (.git/hooks 는 버전 관리 대상이 아니라 각자 설치해야 한다. 이 파일이 그 원본이다.)
+#
+# 조직 축 패턴 파일은 **저장소 밖**에 있다(명단 자체가 유출물이라서).
+#   경로 = $PUBLISH_SCAN_PATTERNS, 기본값 ~/.config/publish-scan-patterns.json
+#   없으면 **막는다** — 절반만 재고 통과시키지 않는다(scan 자체가 exit 2 를 낸다).
+#
+# 우회가 필요하면 `git push --no-verify` — 조용히 지나가는 것과 명시적으로 끄는 것은 다르다.
+
+set -eu
+
+REPO=$(git rev-parse --show-toplevel)
+PATTERNS="${PUBLISH_SCAN_PATTERNS:-$HOME/.config/publish-scan-patterns.json}"
+SCAN="$REPO/tools/publish-scan.mjs"
+
+[ -f "$SCAN" ] || { echo "[pre-push] 검사기 없음: $SCAN — 확인 불가라 막습니다." >&2; exit 1; }
+
+# ① 작업 트리 축
+node "$SCAN" --patterns "$PATTERNS" || {
+  echo "[pre-push] 🔴 파일 축 위반 — push 를 막습니다. 패턴이 아니라 산출물을 고치십시오." >&2
+  exit 1
+}
+
+# ② 커밋 메시지 축 — 이번에 **실제로 올라가는 범위**만 본다.
+#    메시지는 push 되면 파일처럼 못 고치므로, 검사할 자리는 여기뿐이다.
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue   # 삭제 push
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    RANGE="$local_sha"            # 신규 브랜치 — 도달 가능한 전체
+  else
+    RANGE="$remote_sha..$local_sha"
+  fi
+  # 올릴 커밋이 0개면 검사할 게 없다. 스캐너는 빈 범위를 exit 2 로 거절하는데(맞는 동작 —
+  # 직접 호출에서 빈 스캔을 통과로 세면 안 되니까), 훅에서는 그게 **항상 막는 게이트**가 된다.
+  # 늘 막히는 게이트는 --no-verify 가 습관이 되어 결국 없는 것과 같아진다.
+  COUNT=$(git rev-list --count "$RANGE" 2>/dev/null || echo 0)
+  [ "$COUNT" -eq 0 ] && continue
+
+  OUT=$(node "$SCAN" --patterns "$PATTERNS" --git-log "$RANGE" 2>&1) || RC=$?
+  RC=${RC:-0}
+  if [ "$RC" -ne 0 ]; then
+    # 1 = 위반 있음 · 2 = 검사 자체 실패(= 확인 불가). 둘 다 막지만 이유가 다르다.
+    if [ "$RC" -eq 2 ]; then
+      echo "[pre-push] 🔴 커밋 메시지 축을 **검사하지 못했습니다** ($RANGE) — 확인 불가라 막습니다." >&2
+    else
+      echo "[pre-push] 🔴 커밋 메시지 축 위반 ($RANGE) — push 를 막습니다." >&2
+    fi
+    printf '%s\n' "$OUT" | grep -E '^\s*commit |^\[publish-scan\]' >&2 || true
+    echo "[pre-push]   메시지는 올라가면 되돌리기 어렵습니다. git rebase 로 고치거나 --no-verify 로 명시 우회." >&2
+    exit 1
+  fi
+done
+
+exit 0
