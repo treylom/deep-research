@@ -59,6 +59,14 @@ node ~/.claude/skills/searchflow/scripts/env-detect.mjs
   "args": ["<이 저장소 경로>/skills/searchflow/scripts/mcp-server.mjs"] } } }
 ```
 
+비대화형(`claude -p`)으로 돌릴 때는 **도구가 보이는 것과 호출이 허용되는 것이 다릅니다.** 등록만 하면 도구 목록에는 뜨지만 호출은 `…but you haven't granted it yet` 으로 막힙니다. 쓸 도구를 명시해 주세요 — 이름 앞에 서버 이름이 붙습니다:
+
+```bash
+claude -p --mcp-config <위 json 경로> --strict-mcp-config \
+  --allowedTools "mcp__searchflow__searchflow_start" \
+  "<프롬프트>"
+```
+
 **Codex CLI** — `~/.codex/config.toml` 에 **절대 경로**로 적습니다(플러그인 루트 변수는 없습니다):
 
 ```toml
