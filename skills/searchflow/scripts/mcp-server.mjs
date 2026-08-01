@@ -385,7 +385,15 @@ function toolSubmit(args) {
     sources_verbatim: JSON.stringify(sources),
     inbound_bytes: Buffer.byteLength(JSON.stringify(sources), 'utf8'),
   });
-  return recordOutbound(session_id, 'searchflow_submit', { accepted: sources.length, frame_id, next: '남은 프레임을 제출하거나, 다 냈으면 searchflow_gate 를 호출한다.' });
+  // 🔴 개수를 돌려주지 않는다. 구 판본은 `accepted: sources.length` 를 실었는데,
+  //    ⓐ 제출한 쪽이 이미 아는 값이라 **소비자가 0** 이었고(레포 전수 grep 0)
+  //    ⓑ L2 적대 심판 5/5 전원이 그 숫자를 **최소 출처 수 기준**으로 읽었다(51-doc §5.5).
+  //    아무도 안 읽는 값이 기준으로 오독되는 채널만 열어두고 있었다.
+  //    ack 는 "기록됐다"만 말하면 된다 — 수치 없이.
+  return recordOutbound(session_id, 'searchflow_submit', {
+    frame_id, status: 'recorded',
+    next: '남은 프레임을 제출하거나, 다 냈으면 searchflow_gate 를 호출한다.',
+  });
 }
 
 /**
@@ -537,6 +545,17 @@ function selfTest() {
   ok('같은 질문 재시작 = id 분리·앞 원장 보존',
      d1.session_id !== d2.session_id && startsIn(d1.session_id) === 1 && startsIn(d2.session_id) === 1,
      `${d1.session_id} / ${d2.session_id} · start ${startsIn(d1.session_id)},${startsIn(d2.session_id)}`);
+
+  // 5-c submit ack 가 제출 개수를 되돌려주지 않는다 (L2 적대 심판이 그 수를 기준으로 읽었다)
+  const nSrc = 2;
+  const ackSess = S('제출 응답에 개수가 실리는가');
+  const ack = toolSubmit({
+    session_id: ackSess.session_id, frame_id: 'f1',
+    sources: Array.from({ length: nSrc }, (_, i) => ({ url: `https://x${i}`, grade: 'A', status: 'used' })),
+  });
+  ok('submit ack 에 제출 개수 없음',
+     !('accepted' in ack) && !numericTokens(JSON.stringify(ack)).includes(nSrc),
+     JSON.stringify(ack).slice(0, 90));
 
   // 6 enum 위반은 거부 (음성 대조)
   let rejected = false;
