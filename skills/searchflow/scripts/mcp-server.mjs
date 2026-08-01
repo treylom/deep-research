@@ -131,6 +131,11 @@ function ledgerRead(id) {
  *    start 가 그 경로를 truncate 해서 **앞 세션의 원장이 통째로 사라졌다**(재현: 같은 질문 2회 →
  *    파일 1개·start 이벤트 1개). 원장이 이 서버의 증거 전부라 조용한 삭제가 가장 나쁜 형태다.
  *    "재현 가능"은 테스트 편의였고, 그 편의가 지켜야 할 것(증거 보존)을 이겼다.
+ *
+ * ⚠️ 이 `session_id` 는 스킬 공정의 **`run_id` 와 다른 것**이다 — 접두사만 같다.
+ *    run_id = `sf-<YYYYMMDDTHHMMSSZ>-<4hex>`(SKILL.md §P0-6 · `grade-ledger.mjs` 가 형식 강제)로
+ *    타임스탬프라 자연 유일하고, `out/sources.jsonl`·`out/relay.jsonl` 에 실린다.
+ *    session_id = 이 서버의 원장 파일명이며 `sources.jsonl` 스키마와 무관하다. 둘을 섞어 쓰지 말 것.
  */
 function sessionId(question, salt) {
   let h = 2166136261;
