@@ -143,12 +143,29 @@ function selfTest() {
   });
 
   // 음성 대조 2 — 버전·좌표 소수는 오탐 아님
-  const versionish = 'codex 0.146.0 / v1.20 / lat 100.15 / 2.5배 / 항목 1.2.3';
+  //
+  // ⚠️ 여기서 `2.5배` 를 뺐다. 이 케이스는 **버전도 좌표도 아니다** — 그냥 소수 통계값이고,
+  //    "정당한 통계 소수는 통과한다" 는 별개 주장인데 이 fixture 이름 아래 섞여 있었다.
+  //    그리고 그 주장은 scoring.md THREATS 의 선언과 **반대**다: 정당한 소수도 잡히며,
+  //    처방은 패턴을 좁히는 게 아니라 그 수치를 조립문에서 워커에게 넘기지 않는 것이다.
+  //    구 열거형 패턴에서 `2.5` 가 통과했던 건 원칙이 아니라 **목록에 없어서**였다.
+  //    (제거 ❌ 아래 별도 항목으로 옮겨 명시 선언한다 — 침묵 삭제는 커버리지 축소다.)
+  const versionish = 'codex 0.146.0 / v1.20 / lat 100.15 / 항목 1.2.3';
   const vHits = scanText(versionish, '(version)', patterns);
   results.push({
     name: '음성 대조 — 버전·좌표 소수 오탐 0건',
     ok: vHits.length === 0,
     detail: vHits.length ? vHits.map(fmt).join(' / ') : '0건',
+  });
+
+  // 선언 항목 — 정당한 통계 소수도 **의도적으로** 잡힌다(오탐이 아니라 설계).
+  // 이걸 PASS/FAIL 로 두지 않고 관측값으로 남기는 이유: 방향이 정책 결정이라 검사기가 판정할 게 아니다.
+  // 판정을 뒤집고 싶으면 scoring.md THREATS 의 처방(수치를 워커에게 안 넘긴다)을 먼저 바꿔야 한다.
+  const statish = scanText('교차 비율이 2.5배 늘었다 / 유효 응답 0.45 비중', '(stat)', patterns);
+  results.push({
+    name: '선언 — 정당한 통계 소수도 잡힌다(패턴 좁히기 ❌ · 조립문에서 안 넘기는 것이 처방)',
+    ok: statish.length >= 1,
+    detail: statish.length ? `${statish.length}건 검출 = 선언대로` : '0건 — 수치층이 통계 소수를 안 잡는다(범위가 좁아졌는지 확인)',
   });
 
   // 양성 대조 2 — NFD(분해형) 한글도 잡히는가 = 정규화가 실효인가
