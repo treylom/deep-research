@@ -67,6 +67,18 @@ claude -p --mcp-config <위 json 경로> --strict-mcp-config \
   "<프롬프트>"
 ```
 
+⚠️ **플러그인으로 설치했을 때는 도구 이름이 달라집니다.** 위 수동 등록의 이름이 아니라, 서버 이름 앞에 플러그인 이름이 한 겹 더 붙습니다. 실제 이름은 이렇게 확인하세요:
+
+```bash
+claude mcp list      # → plugin:searchflow:searchflow  ✔ Connected
+```
+
+여기 보이는 `plugin:A:B` 가 `mcp__plugin_A_B__<도구>` 가 됩니다. 이름 안의 하이픈은 그대로 남습니다(예: `plugin:memory-bank:memory-bank` → `mcp__plugin_memory-bank_memory-bank__…`).
+
+**마켓플레이스 항목 이름은 여기 안 들어갑니다** — 들어가는 것은 플러그인 자신의 이름(`.claude-plugin/plugin.json` 의 `name`)입니다. 이 저장소가 그 예입니다: 항목 이름은 `deep-research` 인데 도구 이름은 `searchflow` 쪽을 씁니다.
+
+그리고 — **개발 중 `--plugin-dir` 로 붙이면 이 MCP 서버는 안 잡힙니다.** 그 경로에서는 `.mcp.json` 이 읽히지 않습니다(파일 위치를 네 가지로 바꿔 확인 — 어디에 두든 도구가 안 뜹니다). 개발 중에는 위 수동 등록(`--mcp-config`)을 쓰세요.
+
 **Codex CLI** — `~/.codex/config.toml` 에 **절대 경로**로 적습니다(플러그인 루트 변수는 없습니다):
 
 ```toml

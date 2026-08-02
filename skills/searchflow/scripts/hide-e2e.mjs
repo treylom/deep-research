@@ -3,6 +3,7 @@
 //
 // 계약:
 //   argv   : (없음) = 전 검사 실행  |  --corpus <경로> = L2 심판용 말뭉치만 내보내기  |  --json
+//            --corpus-multi <경로> = 같은 기준에서 통과·실패 두 세션을 한 파일로(관측 횟수 효과 검정용)
 //   exit   : 0 = 전 항목 통과 · 1 = 위반 있음 · 2 = 검사 자체 실패(통과 취급 ❌)
 //
 // 무엇을 재는가:
@@ -138,6 +139,7 @@ function main() {
   const asJson = argv.includes('--json');
   const corpusOut = argv.indexOf('--corpus') > -1 ? argv[argv.indexOf('--corpus') + 1] : null;
   const nullOut = argv.indexOf('--corpus-null') > -1 ? argv[argv.indexOf('--corpus-null') + 1] : null;
+  const multiOut = argv.indexOf('--corpus-multi') > -1 ? argv[argv.indexOf('--corpus-multi') + 1] : null;
 
   const results = [];
   const rec = (name, ok, detail) => results.push({ name, ok, detail });
@@ -171,6 +173,25 @@ function main() {
     process.stdout.write('  담은 것 = 도구 이름 + 과업 문장뿐. 뺀 것 = 스키마·설명 원문·원장·브리핑·문서·코드.\n');
     process.stdout.write('  (제외 목록을 파일 안에 적지 않는다 — 그 목록 자체가 심판에게는 정보다.)\n');
     process.stdout.write('  ⚠️ 여기 무엇을 넣느냐가 **기저선**을 정한다 = 판정식의 분모다. 내용 확정은 검증측 승인 후.\n');
+    return 0;
+  }
+
+  // ── 다회차 말뭉치: **한 관측자가 통과·실패를 둘 다 본 경우**를 만든다.
+  //    왜 따로 필요한가: `--corpus` 는 통과 세션 1개다. 그걸로는 "통과선이 얼마 이하"만 나온다.
+  //    통과 1 + 실패 1 을 같이 보면 심판은 문턱을 **두 점수 사이에 가둘 수 있다**(이분탐색).
+  //    = 은닉 하한이 관측 횟수로 나빠진다는 주장의 검정 자료.
+  //    🔴 두 세션은 **같은 기준(A)** 이어야 한다. 기준이 다르면 문턱도 달라서 사이에 가둘 대상이 없다
+  //       — B 팔(통과선 2.4)을 섞으면 이분탐색이 아니라 서로 다른 두 문제를 본 것이 된다.
+  if (multiOut) {
+    // 구분자는 **중립**이어야 한다. "통과 세션"·"실패 세션" 같은 라벨을 파일에 적으면
+    // 그 라벨 자체가 답의 절반이다(어느 쪽이 문턱 위인지 알려준다). 운영자용 설명은 stdout 으로.
+    const body = [`# 세션 1`, a_strong.corpus, '', `# 세션 2`, a_weak.corpus].join('\n');
+    writeFileSync(multiOut, body + '\n', 'utf8');
+    process.stdout.write(`[hide-e2e] 다회차 말뭉치 기록: ${multiOut} (${Buffer.byteLength(body)} B · 세션 2개)\n`);
+    process.stdout.write(`  구성 = 같은 기준(A) · 판정 ${a_strong.decision} / ${a_weak.decision} — 문턱을 사이에 두는 쌍.\n`);
+    process.stdout.write('  파일에는 어느 쪽이 통과인지 안 적었다(라벨이 곧 답이므로). 심판은 본문으로만 판단한다.\n');
+    process.stdout.write('  ⚠️ 이 자료로 재는 것 = "관측을 늘리면 문턱이 좁혀지는가"다. 좁혀져도 L2 실패가 아니라\n' +
+                         '     §5.8 이 이미 말한 설계 한계의 **크기**를 재는 것이다(판정을 주는 게이트의 대가).\n');
     return 0;
   }
 
