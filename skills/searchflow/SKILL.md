@@ -11,10 +11,10 @@ description: Use when a research question needs sourced, cross-checked findings 
 
 ## 0. 두 층
 
-- **core (기본)**: 순정 Claude Code 또는 순정 Codex CLI + 이 스킬 번들만으로 완주한다. 외부 패키지 · 내부 MCP · 특정 플러그인 requirement **0**.
+- **core (기본)**: 순정 Claude Code 또는 순정 Codex CLI + 이 스킬 번들만으로 완주한다. 외부 패키지 · 내부 MCP · 특정 플러그인 requirement **0**. node 실행기는 `scripts/preflight.sh`(§5.1) 가 확보한다. 없으면 관리자 권한 없이 내려받고, 그래도 못 받으면 `degraded=no-node-runtime` 라벨을 남기고 완주한다.
 - **enhanced (선택)**: 환경에 있으면 얹는다. 없으면 **에러 없이 core 로 강등하고 격하 라벨을 보고서에 남긴다** — 조용한 skip 금지.
 
-`scripts/env-detect.mjs` 를 시작 시 1회 실행해 참고값을 얻는다(인자 없이 호출 = exit 0 고정, stdout 1줄 JSON). **탐지 결과는 리드만 소비한다.**
+`scripts/preflight.sh`(§5.1) 다음에 `scripts/env-detect.mjs` 를 1회 실행해 참고값을 얻는다(인자 없이 호출 = exit 0 고정, stdout 1줄 JSON) — 호출은 preflight JSON 의 `node` 경로로. **탐지 결과는 리드만 소비한다.**
 
 > ⚠️ `multi_agent_api` 값은 참고다. **multi-agent 경로의 최종 판정은 리드가 자기 tool 목록을 보고 한다** — shell 스크립트가 모델의 tool 노출을 대신 판정하면 틀린다.
 
@@ -242,7 +242,31 @@ node scripts/relay-check.mjs --test   # 양성 + 음성 5종 + exit 계약
 
 `codex exec` 류로 질문할 수 없으면 **기본값을 채택**한다: 시한 = 시작 + 30분 · 라운드 상한 2. 보고서 「환경·한계」에 `deadline=default` 라벨.
 
-## 5. 권한 preflight (시작 시 1회)
+## 5. preflight (시작 시 1회)
+
+### 5.1 요소 점검·자동 설치(2026-09-03 신설)
+
+```bash
+bash scripts/preflight.sh --json   # stdout JSON 1줄 · exit 0 고정(번들 파일 결손만 1)
+```
+
+| 라벨 | 뜻 |
+|---|---|
+| `node=path` · `node=portable` · `node=portable-cached` · `node=brew` · `node=apt` · `node=winget` | node 실행기를 어디서 확보했나 |
+| `degraded=no-node-runtime` · `degraded=bundle-incomplete` | `no-node-runtime` = node 확보 실패 — 막지 않고 격하로 완주 · `bundle-incomplete` = 번들 파일 결손 — 진행하지 않고 exit 1 |
+| `selftest=pass` · `selftest=skip` · `selftest=fail` | 확보한 node 로 돌린 번들 자체시험 |
+| `state=home` · `state=tmp` | 상태 폴더를 홈에 잡았나 tmp 로 강등했나 |
+| `mcp=present` · `mcp=registered-restart-needed` · `mcp=skipped-no-install` · `mcp=skipped-no-host` · `mcp=register-failed` · `mcp=unknown-host-timeout` | searchflow MCP 서버 등록 상태 — `skipped-no-install` = 호스트는 있는데 `--no-install` 이라 «시도하지 않음» — 시도했다가 실패한 것은 `register-failed` · `unknown-host-timeout` = 호스트가 시한 안에 답하지 않아 등록을 «시도하지 않음»(부재로 단정하지 않는다) |
+| `enhanced=codex:…` · `enhanced=ooo:…` | 강화 요소 — `present`·`installed`·`absent`·`failed` 4값 |
+| `enhanced=hook:…` | 지식 조회 훅 — 탐지만 한다: `present`·`absent` 2값 |
+
+**이후 모든 `node scripts/…` 호출은 JSON 의 `node` 경로로 한다** — preflight 가 내려받은 실행기는 PATH 에 없다.
+
+`--no-install`(=`SEARCHFLOW_PREFLIGHT_INSTALL=0`) 은 점검만 하고, `SEARCHFLOW_PREFLIGHT_ENHANCED=0` 은 강화 요소 설치를 생략하며, `SEARCHFLOW_NODE` 는 실행기를 수동 지정한다. codex 등록 대상은 `~/.codex/config.toml` 이고, `CODEX_HOME` 이 설정돼 있으면 그 아래 `config.toml` 이다.
+
+상태 폴더를 tmp 로 강등할 때 이름은 preflight 가 `searchflow`, MCP 서버가 `searchflow-sessions` 로 다르다 — 무해하다(같은 `TMPDIR` 아래 형제 디렉터리).
+
+### 5.2 권한
 
 | 거부된 권한 | 처분 |
 |---|---|
@@ -272,6 +296,7 @@ node scripts/relay-check.mjs --test   # 양성 + 음성 5종 + exit 계약
 | `goal-collision` | goal 없이 task DAG 진행 + 라벨 |
 | `worker-error` | 그 프레임 순차 재시도 1회 → 실패 시 **프레임 결측 라벨**로 계속 |
 | `malformed-relay` | envelope 키 결손·파싱 불가 = 그 질문 폐기 + 라벨, 워커는 기본값으로 진행 |
+| `no-node-runtime` | 스크립트 검증 전부 skip + 리드 수동 채점 명시 + 라벨 |
 
 ## 7. 종료 조건
 
@@ -291,6 +316,8 @@ node scripts/report-check.mjs out/report.md --labels "$(node scripts/spawn-plan.
 # exit 0=위반 0 · 1=칸 부재/제목만/라벨 부재 · 2=스크립트 오류
 node scripts/report-check.mjs --test   # 양성 0 / 음성 3종 대조
 ```
+
+preflight 의 `labels` 를 spawn-plan labels 뒤에 콤마로 잇는다 — 두 집합이 한 문자열로 `--labels` 에 들어간다.
 
 > 이 검사기는 **칸이 있고 비어있지 않은가**만 본다. 내용의 진위·인용 일치·점수 계산은 보지 않는다 — GREEN 을 "보고서가 옳다"로 인용하지 말 것.
 - `out/sources.jsonl` — schema v1 (리드 single-writer, `grade-ledger.mjs` 통과)
