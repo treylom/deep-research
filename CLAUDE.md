@@ -137,7 +137,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node skills/searchflow/s
 
 **폐기된 것의 `description` 은 반드시 `[DEPRECATED …]` 로 시작합니다 — 스킬만이 아니라 에이전트·커맨드까지 전부.** 본문에 아무리 큰 경고를 붙여도 무엇을 부를지 고르는 층은 `description` 만 보므로, 본문 배너로는 폐기된 공정이 다시 뽑히는 것을 막지 못합니다. 같은 이유가 에이전트(스폰 대상 선택)와 커맨드(호출 목록)에도 그대로 적용됩니다.
 
-현재 적용 대상 1종: `commands/deep-research.md`(구 호출 별칭 리다이렉트 — 2026-07-31 결정으로 존치, 옛 강의 문서 호환). 구 스킬 2종·에이전트 1종은 3.0.2 에서 제거.
+`/deep-research` 명령은 3.0.3 에서 제거됐습니다(`commands/deep-research.md` 삭제) — `/searchflow` 를 쓰세요. 구 스킬 2종·에이전트 1종은 3.0.2 에서 제거.
 
 ## 선택 의존성
 

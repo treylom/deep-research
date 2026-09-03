@@ -47,4 +47,4 @@ node skills/searchflow/scripts/grade-ledger.mjs out/sources.jsonl
 
 ## 구 `/deep-research` 사용자
 
-구 명령은 이 명령으로 위임되는 얇은 리다이렉트로 존치한다. **기존 run 원장은 read-only 로 보존**되며 신규 run 만 schema v1 로 기록된다 — 구 데이터를 변환하지 않는다(무손실 보존 + 이중 계약 회피). 기존 run 의 재개(resume)는 지원하지 않으니 신규 run 으로 재실행한다.
+구 명령 `/deep-research` 는 3.0.3 에서 제거됐다 — `/searchflow` 를 쓴다. **기존 run 원장은 read-only 로 보존**되며 신규 run 만 schema v1 로 기록된다 — 구 데이터를 변환하지 않는다(무손실 보존 + 이중 계약 회피). 기존 run 의 재개(resume)는 지원하지 않으니 신규 run 으로 재실행한다.
