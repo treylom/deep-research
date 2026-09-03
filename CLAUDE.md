@@ -77,7 +77,7 @@ claude mcp list      # → plugin:searchflow:searchflow  ✔ Connected
 
 *(근거 — 같은 세션에서 `claude mcp list` 출력과 실제로 보이는 도구 이름을 대조했습니다: 이름을 볼 수 있었던 플러그인 5종 전부 일치. 등록은 6종이지만 1종은 도구 목록 조회가 시간 초과라 대조에서 뺐습니다. 대비군으로, 플러그인을 거치지 않고 등록한 서버는 접두가 붙지 않았습니다 — `vault-search` → `mcp__vault-search__…`.)*
 
-**마켓플레이스 항목 이름은 여기 안 들어갑니다** — 들어가는 것은 플러그인 자신의 이름(`.claude-plugin/plugin.json` 의 `name`)입니다. 이 저장소가 그 예입니다: 항목 이름은 `deep-research` 인데 도구 이름은 `searchflow` 쪽을 씁니다.
+**마켓플레이스 항목 이름은 여기 안 들어갑니다** — 들어가는 것은 플러그인 자신의 이름(`.claude-plugin/plugin.json` 의 `name`)입니다. 이 저장소가 그 예입니다: 마켓 항목·플러그인 이름 모두 `searchflow` 이고(구 항목 `deep-research` 는 3.0.2 에서 내림) 저장소 이름만 아직 `deep-research` 입니다.
 
 그리고 — **개발 중 `--plugin-dir` 로 붙이면 이 MCP 서버는 안 잡힙니다.** 그 경로에서는 `.mcp.json` 이 읽히지 않습니다(파일 위치를 네 가지로 바꿔 확인 — 어디에 두든 도구가 안 뜹니다). 개발 중에는 위 수동 등록(`--mcp-config`)을 쓰세요.
 
@@ -125,8 +125,6 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node skills/searchflow/s
 
 깊이는 묻지 않습니다 — 점수가 문턱을 넘으면 그 자리에서 끝나고, 못 넘으면 가장 약한 축만 다시 봅니다.
 
-`/deep-research` 로 불러도 동작합니다(구 이름 — SearchFlow 로 위임).
-
 ## 문서 언어
 
 사람이 읽는 문서 본문은 **한국어**로 씁니다. `description` 필드만 자리에 따라 갈립니다:
@@ -139,7 +137,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node skills/searchflow/s
 
 **폐기된 것의 `description` 은 반드시 `[DEPRECATED …]` 로 시작합니다 — 스킬만이 아니라 에이전트·커맨드까지 전부.** 본문에 아무리 큰 경고를 붙여도 무엇을 부를지 고르는 층은 `description` 만 보므로, 본문 배너로는 폐기된 공정이 다시 뽑히는 것을 막지 못합니다. 같은 이유가 에이전트(스폰 대상 선택)와 커맨드(호출 목록)에도 그대로 적용됩니다.
 
-현재 적용 대상 4종: `skills/deep-research-pipeline.md` · `skills/deep-research-source-quality.md` · `agents/deep-researcher.md` · `commands/deep-research.md`.
+현재 적용 대상 1종: `commands/deep-research.md`(구 호출 별칭 리다이렉트 — 2026-07-31 결정으로 존치, 옛 강의 문서 호환). 구 스킬 2종·에이전트 1종은 3.0.2 에서 제거.
 
 ## 선택 의존성
 

@@ -1,7 +1,7 @@
 {
   "name": "searchflow",
   "description": "Research pipeline that decides depth after the evidence: source-grade weighted scoring, worker-hidden thresholds, and type-driven investigation frames.",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "author": {
     "name": "tofukyung",
     "url": "https://github.com/treylom"
@@ -11,7 +11,6 @@
   "license": "MIT",
   "keywords": [
     "searchflow",
-    "deep-research",
     "fact-checking",
     "source-verification",
     "cross-validation",

@@ -1,6 +1,6 @@
 ---
 name: deep-research
-description: "[DEPRECATED — /searchflow 로 대체됨] 구 7-Phase 딥리서치 진입점. 호출은 /searchflow 로 위임됩니다."
+description: "[DEPRECATED — /searchflow 로 대체됨] 구 이름 리다이렉트 — 옛 강의·안내 문서가 /deep-research 로 부를 때만 쓰며 /searchflow 로 위임됩니다. 새로 쓰실 때는 /searchflow."
 argument-hint: <조사할 질문 또는 검증할 주장>
 allowedTools: Agent, AskUserQuestion, Read, Write, Glob, Grep, WebSearch, WebFetch, Bash, Skill
 ---
@@ -40,4 +40,4 @@ allowedTools: Agent, AskUserQuestion, Read, Write, Glob, Grep, WebSearch, WebFet
 
 ## 구 참조 파일
 
-`skills/deep-research-pipeline.md` · `skills/deep-research-source-quality.md` · `agents/deep-researcher.md` 는 이력·대조용으로 남아 있으며 **신 공정의 실행 경로에는 없다.**
+구 공정 파일(`skills/deep-research-pipeline.md` · `skills/deep-research-source-quality.md` · `agents/deep-researcher.md`)은 **3.0.2 에서 제거됐다** — 스킬 목록에 구 이름이 함께 뜨는 혼동 때문이며, 대조가 필요하면 git 이력(3.0.2 로 올린 커밋 이전)에서 본다. 이 리다이렉트만 남는다.

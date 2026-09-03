@@ -23,17 +23,12 @@
 deep-research/                        # 저장소 이름은 아직 옛 이름입니다 (공정만 SearchFlow 로 교체)
 ├── commands/
 │   ├── searchflow.md                 # /searchflow — 진입점
-│   └── deep-research.md              # (deprecated) 구 호출용 얇은 리다이렉트
 ├── skills/
 │   ├── searchflow/
 │   │   ├── SKILL.md                  # 공정 정본
 │   │   ├── references/               # 유형·프레임·취득·등급·합성·산출 계약
 │   │   ├── scripts/                  # 검사기·게이트 (node, 외부 패키지 0)
 │   │   └── fixtures/                 # 실측 기록·테스트 고정 입력
-│   ├── deep-research-pipeline.md         # (deprecated) 구 7-Phase 엔진
-│   └── deep-research-source-quality.md   # (deprecated) 구 A–E 등급
-├── agents/
-│   └── deep-researcher.md            # (deprecated) 구 워커 에이전트
 ├── tools/
 │   └── publish-scan.mjs              # 공개 전 안전 스캔
 ├── CLAUDE.md
@@ -46,8 +41,6 @@ deep-research/                        # 저장소 이름은 아직 옛 이름입
 |------|--------|
 | 질문 하나 조사 | `/searchflow 조사할 질문 또는 검증할 주장` |
 | 인터랙티브 | `/searchflow` |
-
-구 호출 `/deep-research` 도 그대로 동작합니다 — SearchFlow 공정으로 위임됩니다.
 
 ## 설치
 
@@ -62,7 +55,7 @@ CLAUDE.md 참조. **스크립트를 직접 실행하므로 `node` 가 필요합�
 
 ## 레거시 (구 `/deep-research`)
 
-구 7-Phase 파이프라인과 A–E 등급 체계는 **폐기**됐고, 문서는 예전 참조가 깨지지 않도록 남겨 뒀습니다(`skills/deep-research-*.md` · `agents/deep-researcher.md`). 새 작업에는 쓰지 마세요 — 특히 **A–E 등급과 현행 등급 체계는 기준 자체가 다릅니다**(전자는 매체 목록 기반, 후자는 주장 대비 URL 지위 기반).
+구 7-Phase 파이프라인 스킬 2종·에이전트 1종·A–E 등급 문서는 3.0.2 에서 제거됐습니다(스킬 목록에 구 이름이 함께 뜨는 혼동 때문). 구 명령 `/deep-research` 는 **얇은 리다이렉트로만 존치**합니다 — 옛 강의·안내 문서가 그 이름으로 부르기 때문이며(2026-07-31 결정), 새로 쓰실 때는 `/searchflow` 를 쓰세요. 구 run 원장은 그대로 읽을 수 있고, 필요하면 git 이력(3.0.2 로 올린 커밋 이전)에서 복원합니다.
 
 > 세는 방법이 두 가지라 헷갈리기 쉬운데 **둘 다 맞습니다**: 사람이 부르는 **등급 이름은 4개**(원Source·A급·B급·C급)이고, 원장에 적히는 **`grade` 값은 5개**(`ORIGINAL|A|B|C|UNREACHABLE`)입니다. `UNREACHABLE`(못 읽음)에는 대응하는 한국어 등급 이름이 없고, `사용불가` 는 등급이 아니라 처분이라 `grade` 값이 아닙니다. 정본 = `skills/searchflow/references/scoring.md` **§1-1**.
 
