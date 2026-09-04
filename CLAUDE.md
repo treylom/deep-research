@@ -15,10 +15,9 @@
 #    대상 안에 `skills/skills/` 로 한 겹 더 들어갑니다. 끝에 `/*` 를 붙이면 안전합니다.
 #    (macOS `/bin/cp` 실측: `skills/*`·`skills/` 는 안 들어가고, `skills` 만 들어갑니다.
 #     GNU cp 는 미확인 — 확실한 `/*` 형태를 씁니다.)
-mkdir -p ~/.claude/skills ~/.claude/commands ~/.claude/agents
+mkdir -p ~/.claude/skills ~/.claude/commands
 cp -r skills/*   ~/.claude/skills/
 cp -r commands/* ~/.claude/commands/
-cp -r agents/*   ~/.claude/agents/
 ```
 
 `skills/searchflow/` 는 **폴더 통째로** 옮겨져야 합니다. 안에 `scripts/`(검사기)와 `references/`(공정 세부)가 들어 있고, 공정이 실행 중에 이 둘을 직접 읽습니다. `SKILL.md` 한 장만 복사하면 동작하지 않습니다.
